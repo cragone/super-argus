@@ -41,6 +41,7 @@ func (h *Handler) Loki(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "bad_request", "invalid gzip body")
 		return
 	}
+	allowed := parseAllowedLabels(key.AllowedLabels)
 	raw, err := io.ReadAll(body)
 	if err != nil {
 		var mbe *http.MaxBytesError
@@ -94,7 +95,7 @@ func (h *Handler) Loki(w http.ResponseWriter, r *http.Request) {
 			for k, v := range base {
 				labels[k] = v
 			}
-			p, err := h.makePending(labels, e.ts, e.line, now)
+			p, err := h.makePending(labels, e.ts, e.line, now, allowed)
 			if err != nil {
 				resp.reject(n, err.Error())
 				continue

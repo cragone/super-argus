@@ -47,6 +47,12 @@ Body is NDJSON, optionally gzip (`Content-Encoding: gzip`), max 5 MB:
 
 **Do not put user IDs, request IDs or session IDs in labels.** Every distinct label set is a stream, and each API key may hold at most `ARGUS_MAX_STREAMS_PER_KEY` (default 10,000) of them. Put high-cardinality values in the log line instead.
 
+### Restricting an API key's labels
+
+An API key's `allowed_labels` (set at creation, `POST /api-keys`) restricts the values it may write for the label keys it names: `{"service": "checkout"}` allows only `service=checkout`; `{"service": ["checkout", "billing"]}` allows either. A label key not named in `allowed_labels` passes through unrestricted — this only locks down the keys an operator chooses to name, not the whole label set — and an empty or absent `allowed_labels` (the default for every key today) is unrestricted, same as before this existed. A push using a disallowed value is rejected the same way a too-long value is.
+
+This restricts what a key can **write**, not what a logged-in user can **read**: there is no query-time tenant isolation yet, so any authenticated user can still query across every stream regardless of which key ingested it. Treat `allowed_labels` as a guard against a misconfigured shipper, not as multi-tenant data isolation.
+
 ### Limits
 15 labels per stream, 256 bytes per label value, 64 KB per line (longer lines are truncated with a `...[truncated]` marker), per-key rate limits `ARGUS_RATE_LINES_PER_SEC` (default 10,000; a key's own `rate_limit` overrides it) and `ARGUS_RATE_BYTES_PER_SEC` (default 10 MB), with bursts up to 5x.
 

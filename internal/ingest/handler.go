@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -134,6 +135,7 @@ func (h *Handler) Push(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "bad_request", "invalid gzip body")
 		return
 	}
+	allowed := parseAllowedLabels(key.AllowedLabels)
 
 	now := h.Now()
 	var resp pushResponse
@@ -146,7 +148,7 @@ func (h *Handler) Push(w http.ResponseWriter, r *http.Request) {
 		if len(bytes.TrimSpace(raw)) == 0 {
 			continue
 		}
-		p, err := h.parseLine(raw, defaults, now)
+		p, err := h.parseLine(raw, defaults, now, allowed)
 		if err != nil {
 			resp.reject(n, err.Error())
 			continue
@@ -275,7 +277,7 @@ func (h *Handler) bodyReader(w http.ResponseWriter, r *http.Request) (io.Reader,
 	return rc, nil
 }
 
-func (h *Handler) parseLine(raw []byte, defaults map[string]string, now time.Time) (pending, error) {
+func (h *Handler) parseLine(raw []byte, defaults map[string]string, now time.Time, allowed map[string][]string) (pending, error) {
 	var in pushLine
 	if err := json.Unmarshal(raw, &in); err != nil {
 		return pending{}, errors.New("invalid JSON")
@@ -294,24 +296,29 @@ func (h *Handler) parseLine(raw []byte, defaults map[string]string, now time.Tim
 	for k, v := range in.Labels {
 		labels[k] = v
 	}
-	return h.makePending(labels, ts, *in.Line, now)
+	return h.makePending(labels, ts, *in.Line, now, allowed)
 }
 
 // makePending validates one line's timestamp and labels against the limits and
 // returns it ready to commit. line must be non-empty.
-func (h *Handler) makePending(labels map[string]string, ts int64, line string, now time.Time) (pending, error) {
+func (h *Handler) makePending(labels map[string]string, ts int64, line string, now time.Time, allowed map[string][]string) (pending, error) {
 	if age := now.Sub(time.Unix(0, ts)); age > h.Limits.MaxAge {
 		return pending{}, fmt.Errorf("timestamp older than %s", h.Limits.MaxAge)
 	} else if -age > h.Limits.MaxFuture {
 		return pending{}, fmt.Errorf("timestamp more than %s in the future", h.Limits.MaxFuture)
 	}
-	if err := h.validateLabels(labels); err != nil {
+	if err := h.validateLabels(labels, allowed); err != nil {
 		return pending{}, err
 	}
 	return pending{labels: labels, text: index.LabelsText(labels), ts: ts, line: h.truncate(line)}, nil
 }
 
-func (h *Handler) validateLabels(labels map[string]string) error {
+// validateLabels checks label count/name/value limits, then, if allowed is
+// non-empty, rejects any label whose key it restricts but whose value isn't
+// in the allowed set. allowed only restricts the keys it names; any label
+// key absent from allowed passes through unrestricted. A nil/empty allowed
+// means the key is unrestricted (the default for every key today).
+func (h *Handler) validateLabels(labels map[string]string, allowed map[string][]string) error {
 	if len(labels) == 0 {
 		return errors.New("at least one label is required")
 	}
@@ -328,8 +335,43 @@ func (h *Handler) validateLabels(labels map[string]string) error {
 		if !utf8.ValidString(v) {
 			return fmt.Errorf("value of label %q is not valid UTF-8", k)
 		}
+		if vals, restricted := allowed[k]; restricted && !slices.Contains(vals, v) {
+			return fmt.Errorf("label %q=%q is not allowed for this API key", k, v)
+		}
 	}
 	return nil
+}
+
+// parseAllowedLabels parses an API key's AllowedLabels column (a JSON object
+// whose values are either a single allowed string or a list of allowed
+// strings) into label name -> allowed values. A missing, empty, or malformed
+// column means unrestricted (nil), the same as before this restriction
+// existed, so it is backward compatible with every key that never set it.
+func parseAllowedLabels(raw string) map[string][]string {
+	if raw == "" {
+		return nil
+	}
+	var in map[string]any
+	if json.Unmarshal([]byte(raw), &in) != nil || len(in) == 0 {
+		return nil
+	}
+	out := make(map[string][]string, len(in))
+	for k, v := range in {
+		switch val := v.(type) {
+		case string:
+			out[k] = []string{val}
+		case []any:
+			for _, e := range val {
+				if s, ok := e.(string); ok {
+					out[k] = append(out[k], s)
+				}
+			}
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 func (h *Handler) truncate(s string) string {

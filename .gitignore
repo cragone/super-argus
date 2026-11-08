@@ -45,6 +45,11 @@ testapp/*.db-*
 testapp/testapp.exe
 testapp/.env.generated
 
+# go build output when `go build ./...` resolves to a single main package
+/agent/agent
+/testapp/testapp
+/sdk/go/go
+
 # nix / process-compose
 .direnv/
 process-compose.log

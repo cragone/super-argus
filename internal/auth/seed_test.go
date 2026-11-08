@@ -3,27 +3,16 @@ package auth
 import (
 	"io"
 	"log/slog"
-	"path/filepath"
 	"testing"
 
-	"github.com/cragone/Super-Argus/internal/db"
+	"github.com/cragone/Super-Argus/internal/dbtest"
 	"github.com/cragone/Super-Argus/internal/models"
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
 )
 
-func testDB(t *testing.T) *gorm.DB {
-	t.Helper()
-	g, err := db.Open("sqlite:" + filepath.Join(t.TempDir(), "t.db"))
-	require.NoError(t, err)
-	sqlDB, _ := g.DB()
-	t.Cleanup(func() { _ = sqlDB.Close() })
-	require.NoError(t, db.Migrate(g))
-	return g
-}
-
 func TestSeedAdmin(t *testing.T) {
-	g := testDB(t)
+	g := dbtest.OpenForTest(t)
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 
 	require.NoError(t, SeedAdmin(g, "", "", log))
@@ -41,7 +30,7 @@ func TestSeedAdmin(t *testing.T) {
 }
 
 func TestLookupAPIKey(t *testing.T) {
-	g := testDB(t)
+	g := dbtest.OpenForTest(t)
 	key, prefix, hash, _ := GenerateAPIKey()
 	k := models.APIKey{Name: "n", KeyHash: hash, KeyPrefix: prefix, AllowedLabels: "{}"}
 	require.NoError(t, g.Create(&k).Error)

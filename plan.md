@@ -34,7 +34,7 @@ Argus is a self-hosted, logs-only observability tool modeled on Grafana + Loki. 
 | HTTP router | chi |
 | ORM | **GORM** (metadata and index only, never log lines) |
 | Migrations | **goose** (SQL files, embedded with `go:embed`) |
-| Metadata DB | SQLite (WAL mode, pure-Go driver `github.com/glebarez/sqlite`), Postgres supported via config |
+| Metadata DB | SQLite (WAL mode, pure-Go driver `github.com/glebarez/sqlite`), Postgres validated in CI against Postgres 16 |
 | Log storage | Custom chunk store on local disk (Loki-style), zstd compression (`klauspost/compress`) |
 | Auth | argon2id password hashing, JWT for UI sessions, hashed API keys for ingest |
 | Config | env vars + optional `argus.yaml` (koanf) |

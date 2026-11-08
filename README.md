@@ -12,6 +12,10 @@ go run ./cmd/argus
 
 `.env` is picked up from the working directory or any parent. Real environment variables win over `.env`.
 
+### Postgres instead of SQLite
+
+Set `ARGUS_DB_DSN=postgres://user:pass@host:5432/dbname?sslmode=disable` to use Postgres for metadata and the chunk index instead of the default SQLite file. Migrations and GORM model behavior are validated in CI against Postgres 16 (see `.github/workflows/ci.yml`'s `postgres` job and `internal/db/db_test.go`'s `TestOpenAndMigrate_Postgres`); `docker-compose up -d postgres` gives the same thing locally. `argus backup` does not support Postgres — use `pg_dump` instead.
+
 ## Local dev environment (Nix)
 
 `flake.nix` provides two dev shells and a one-command local environment:

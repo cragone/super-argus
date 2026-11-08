@@ -56,6 +56,12 @@ Every accepted line is appended to the WAL before the request is acknowledged. T
 
 Head chunks flush to disk at ~1 MB or ~1 h of age, and on graceful shutdown. Chunks older than `ARGUS_RETENTION_DAYS` (default 14) are deleted hourly, along with streams that have no chunks left.
 
+### Chunk storage backend
+
+Chunks are stored on local disk by default (`ARGUS_CHUNK_STORE=local`, the layout above). Set `ARGUS_CHUNK_STORE=s3` to store them in an S3-compatible bucket instead: `ARGUS_S3_BUCKET` (required), plus optional `ARGUS_S3_REGION`, `ARGUS_S3_ENDPOINT` (point this at MinIO or another S3-compatible service; it enables path-style addressing), and `ARGUS_S3_PREFIX`. Credentials come from the standard AWS chain (env vars, shared config/credentials files, or an IAM role) — there is no Argus-specific credential setting. The WAL and SQLite index always stay on local disk; only chunk files move.
+
+**Backup with `ARGUS_CHUNK_STORE=s3`:** `argus backup` only copies the WAL and the SQLite index in this mode — there is no local chunk tree to walk, and S3's own durability is the substitute for the chunk-copy step. The backup log line says so explicitly (`chunks_not_copied_reason` / a `WARN` instead of an `INFO` on completion).
+
 ### Load testing
 ```
 ARGUS_LOAD_SECONDS=600 ARGUS_LOAD_RATE=2000 go test ./internal/ingest -run TestLoad -timeout 20m -v

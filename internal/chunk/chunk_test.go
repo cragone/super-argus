@@ -84,24 +84,19 @@ func TestCorrupt(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestKeyFormat(t *testing.T) {
+	require.Equal(t, "2023/11/14/7/abc.chk", Key(1_700_000_000_000_000_000, 7, "abc"))
+}
+
 func TestLocalStore(t *testing.T) {
 	dir := t.TempDir()
+	testStoreContract(t, func() Store { return NewLocalStore(dir) })
+
+	// Local-disk-specific: Delete prunes now-empty parent directories too.
 	s := NewLocalStore(dir)
 	key := Key(1_700_000_000_000_000_000, 7, "abc")
-	require.Equal(t, "2023/11/14/7/abc.chk", key)
 	require.NoError(t, s.Put(key, []byte("hello")))
-	b, err := s.Get(key)
-	require.NoError(t, err)
-	require.Equal(t, "hello", string(b))
-
 	require.NoError(t, s.Delete(key))
-	require.NoError(t, s.Delete(key)) // idempotent
-	_, err = s.Get(key)
-	require.ErrorIs(t, err, os.ErrNotExist)
 	entries, _ := os.ReadDir(dir)
 	require.Empty(t, entries, "empty parent dirs removed")
-
-	for _, bad := range []string{"", "../x", "a/../../x", "/abs", "a//b", `a\b`} {
-		require.Error(t, s.Put(bad, nil), bad)
-	}
 }

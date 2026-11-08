@@ -38,11 +38,18 @@ type Result struct {
 	// MissingChunks are indexed chunks absent from the copy, usually deleted by
 	// retention between the snapshot and the copy. They are not errors.
 	MissingChunks int
+	// ChunksNotCopiedReason is set instead of copying chunks when they are not
+	// stored on the local data directory (see localChunks on Run).
+	ChunksNotCopiedReason string
 }
 
 // Run backs up dataDir into dest. g must be the live database; only SQLite
-// can be snapshotted this way (use pg_dump for Postgres).
-func Run(ctx context.Context, g *gorm.DB, dataDir, dest string) (Result, error) {
+// can be snapshotted this way (use pg_dump for Postgres). localChunks must be
+// false when the server's chunk store is not local disk (ARGUS_CHUNK_STORE=s3):
+// chunk files then live outside dataDir, so the chunk-copy step is skipped and
+// this backup covers only the WAL and the SQLite index. S3's own durability
+// substitutes for the chunk-copy step in that case.
+func Run(ctx context.Context, g *gorm.DB, dataDir, dest string, localChunks bool) (Result, error) {
 	var res Result
 	if g.Dialector.Name() != "sqlite" {
 		return res, errors.New("backup supports SQLite only; back up Postgres with pg_dump")
@@ -88,10 +95,17 @@ func Run(ctx context.Context, g *gorm.DB, dataDir, dest string) (Result, error) 
 	}
 	res.DBBytes = fi.Size()
 
-	// 3. Chunks, incrementally.
-	chunksDest := filepath.Join(absDest, "chunks")
-	if res.ChunksCopied, res.ChunksSkipped, err = copyTree(ctx, filepath.Join(absData, "chunks"), chunksDest, true); err != nil {
-		return res, fmt.Errorf("copy chunks: %w", err)
+	// 3. Chunks, incrementally. Skipped entirely for a non-local chunk store:
+	// there is no local chunk tree to walk, and the backend's own durability
+	// (e.g. S3) is this backup's substitute for the chunk-copy step.
+	var chunksDest string
+	if localChunks {
+		chunksDest = filepath.Join(absDest, "chunks")
+		if res.ChunksCopied, res.ChunksSkipped, err = copyTree(ctx, filepath.Join(absData, "chunks"), chunksDest, true); err != nil {
+			return res, fmt.Errorf("copy chunks: %w", err)
+		}
+	} else {
+		res.ChunksNotCopiedReason = "chunks are not stored on local disk (ARGUS_CHUNK_STORE=s3); this backup covers WAL and SQLite only"
 	}
 
 	// Verify the snapshot we wrote, not the live database.

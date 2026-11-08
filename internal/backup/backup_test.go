@@ -51,7 +51,7 @@ func TestBackupAndRestoreRoundTrip(t *testing.T) {
 	k1 := r.addChunk("c1", "first")
 	dest := filepath.Join(t.TempDir(), "bk")
 
-	res, err := Run(context.Background(), r.g, r.data, dest)
+	res, err := Run(context.Background(), r.g, r.data, dest, true)
 	require.NoError(t, err)
 	require.Equal(t, 1, res.ChunksCopied)
 	require.Equal(t, 1, res.WALFiles)
@@ -80,14 +80,14 @@ func TestBackupIsIncrementalAndRefreshesWAL(t *testing.T) {
 	r := newRig(t)
 	r.addChunk("c1", "first")
 	dest := filepath.Join(t.TempDir(), "bk")
-	_, err := Run(context.Background(), r.g, r.data, dest)
+	_, err := Run(context.Background(), r.g, r.data, dest, true)
 	require.NoError(t, err)
 
 	r.addChunk("c2", "second")
 	require.NoError(t, os.Remove(filepath.Join(r.data, "wal", "wal-000001.log")))
 	require.NoError(t, os.WriteFile(filepath.Join(r.data, "wal", "wal-000002.log"), []byte("new"), 0o644))
 
-	res, err := Run(context.Background(), r.g, r.data, dest)
+	res, err := Run(context.Background(), r.g, r.data, dest, true)
 	require.NoError(t, err)
 	require.Equal(t, 1, res.ChunksCopied, "only the new chunk is copied")
 	require.Equal(t, 1, res.ChunksSkipped, "the unchanged chunk is not copied again")
@@ -97,11 +97,29 @@ func TestBackupIsIncrementalAndRefreshesWAL(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestBackupSkipsChunksWhenNotLocal(t *testing.T) {
+	r := newRig(t)
+	r.addChunk("c1", "first")
+	dest := filepath.Join(t.TempDir(), "bk")
+
+	res, err := Run(context.Background(), r.g, r.data, dest, false)
+	require.NoError(t, err)
+	require.NotEmpty(t, res.ChunksNotCopiedReason)
+	require.Zero(t, res.ChunksCopied)
+	require.Zero(t, res.ChunksSkipped)
+	_, err = os.Stat(filepath.Join(dest, "chunks"))
+	require.True(t, os.IsNotExist(err), "no chunks directory is created in the copy")
+	// WAL and the index are still backed up.
+	b, err := os.ReadFile(filepath.Join(dest, "wal", "wal-000001.log"))
+	require.NoError(t, err)
+	require.Equal(t, "pending lines", string(b))
+}
+
 func TestBackupReportsMissingChunks(t *testing.T) {
 	r := newRig(t)
 	k := r.addChunk("c1", "first")
 	require.NoError(t, r.store.Delete(k)) // retention removed the file but the index row is still there
-	res, err := Run(context.Background(), r.g, r.data, filepath.Join(t.TempDir(), "bk"))
+	res, err := Run(context.Background(), r.g, r.data, filepath.Join(t.TempDir(), "bk"), true)
 	require.NoError(t, err)
 	require.Equal(t, 1, res.MissingChunks, "reported, not fatal")
 }
@@ -109,7 +127,7 @@ func TestBackupReportsMissingChunks(t *testing.T) {
 func TestBackupRefusesDestinationInsideData(t *testing.T) {
 	r := newRig(t)
 	for _, dest := range []string{r.data, filepath.Join(r.data, "backups")} {
-		_, err := Run(context.Background(), r.g, r.data, dest)
+		_, err := Run(context.Background(), r.g, r.data, dest, true)
 		require.Error(t, err, dest)
 	}
 	_, err := os.Stat(filepath.Join(r.data, "backups"))
@@ -123,7 +141,7 @@ func TestBackupWithNoChunksOrWAL(t *testing.T) {
 	sqlDB, _ := g.DB()
 	defer sqlDB.Close()
 	require.NoError(t, db.Migrate(g))
-	res, err := Run(context.Background(), g, data, filepath.Join(t.TempDir(), "bk"))
+	res, err := Run(context.Background(), g, data, filepath.Join(t.TempDir(), "bk"), true)
 	require.NoError(t, err)
 	require.Zero(t, res.ChunksCopied+res.WALFiles)
 }

@@ -36,6 +36,11 @@ type Config struct {
 	MetricsToken     string // ARGUS_METRICS_TOKEN: bearer token for /metrics scrapers
 	Redact           string // ARGUS_REDACT: email,bearer,card,ip or all
 	Sample           string // ARGUS_SAMPLE: service=percent,...
+	ChunkStore       string // ARGUS_CHUNK_STORE: local (default) or s3
+	S3Bucket         string // ARGUS_S3_BUCKET
+	S3Region         string // ARGUS_S3_REGION
+	S3Endpoint       string // ARGUS_S3_ENDPOINT: set for MinIO/R2/other S3-compatible services
+	S3Prefix         string // ARGUS_S3_PREFIX: optional key prefix within the bucket
 }
 
 func env(k, def string) string {
@@ -101,6 +106,20 @@ func load(needSecret bool) (*Config, error) {
 	c.DBDSN = env("ARGUS_DB_DSN", "sqlite:"+filepath.Join(c.DataDir, "argus.db"))
 	if needSecret && c.JWTSecret == "" {
 		return nil, errors.New("ARGUS_JWT_SECRET is required")
+	}
+	c.ChunkStore = env("ARGUS_CHUNK_STORE", "local")
+	c.S3Bucket = os.Getenv("ARGUS_S3_BUCKET")
+	c.S3Region = os.Getenv("ARGUS_S3_REGION")
+	c.S3Endpoint = os.Getenv("ARGUS_S3_ENDPOINT")
+	c.S3Prefix = os.Getenv("ARGUS_S3_PREFIX")
+	switch c.ChunkStore {
+	case "local":
+	case "s3":
+		if c.S3Bucket == "" {
+			return nil, errors.New("ARGUS_S3_BUCKET is required when ARGUS_CHUNK_STORE=s3")
+		}
+	default:
+		return nil, errors.New("ARGUS_CHUNK_STORE must be local or s3")
 	}
 	return c, nil
 }

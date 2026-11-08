@@ -692,18 +692,39 @@ export interface components {
              * @default webhook
              * @enum {string}
              */
-            type: "webhook";
-            /** @description http(s) URL; required on create */
+            type: "webhook" | "email" | "sms";
+            /** @description For type webhook */
             url?: string;
-            /** @description Optional HMAC signing secret (sent as X-Argus-Signature); omit to keep */
+            /** @description For type email */
+            smtp_host?: string;
+            /** @description For type email */
+            smtp_port?: number;
+            /** @description For type email */
+            username?: string;
+            /** @description For type sms */
+            account_sid?: string;
+            /** @description For type email or sms */
+            from?: string;
+            /** @description For type email or sms, the recipient addresses or phone numbers; required on create */
+            to?: string[];
+            /** @description The one secret this channel type needs (webhook signing secret */
             secret?: string;
         };
         Channel: {
             id: string;
             name: string;
             /** @enum {string} */
-            type: "webhook";
-            url_host: string;
+            type: "webhook" | "email" | "sms";
+            /** @description Present for type webhook */
+            url_host?: string;
+            /** @description Present for type email */
+            smtp_host?: string;
+            /** @description Present for type sms */
+            account_sid?: string;
+            /** @description Present for type email or sms */
+            from?: string;
+            /** @description Present for type email or sms */
+            to?: string[];
             has_secret: boolean;
             /** Format: date-time */
             created_at: string;

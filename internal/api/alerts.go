@@ -22,32 +22,74 @@ const maxChannelsPerRule = 10
 // --- notification channels ---
 
 type channelView struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	Type      string    `json:"type"`
-	URLHost   string    `json:"url_host"`
-	HasSecret bool      `json:"has_secret"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID         string    `json:"id"`
+	Name       string    `json:"name"`
+	Type       string    `json:"type"`
+	URLHost    string    `json:"url_host,omitempty"`    // webhook
+	SMTPHost   string    `json:"smtp_host,omitempty"`   // email
+	AccountSID string    `json:"account_sid,omitempty"` // sms, masked after the first 4 characters
+	From       string    `json:"from,omitempty"`        // email, sms
+	To         []string  `json:"to,omitempty"`          // email, sms
+	HasSecret  bool      `json:"has_secret"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
 }
 
 func viewChannel(c models.NotificationChannel) channelView {
 	v := channelView{ID: c.ID, Name: c.Name, Type: c.Type, CreatedAt: c.CreatedAt, UpdatedAt: c.UpdatedAt}
-	var cfg notify.WebhookConfig
-	if json.Unmarshal([]byte(c.Config), &cfg) == nil {
-		if u, err := url.Parse(cfg.URL); err == nil {
-			v.URLHost = u.Host
+	switch c.Type {
+	case "email":
+		var cfg notify.EmailConfig
+		if json.Unmarshal([]byte(c.Config), &cfg) == nil {
+			v.SMTPHost, v.From, v.To = cfg.SMTPHost, cfg.From, cfg.To
+			v.HasSecret = cfg.PasswordEnc != ""
 		}
-		v.HasSecret = cfg.SecretEnc != ""
+	case "sms":
+		var cfg notify.SMSConfig
+		if json.Unmarshal([]byte(c.Config), &cfg) == nil {
+			v.AccountSID, v.From, v.To = maskSecret(cfg.AccountSID), cfg.From, cfg.To
+			v.HasSecret = cfg.AuthTokenEnc != ""
+		}
+	default: // "webhook"
+		var cfg notify.WebhookConfig
+		if json.Unmarshal([]byte(c.Config), &cfg) == nil {
+			if u, err := url.Parse(cfg.URL); err == nil {
+				v.URLHost = u.Host
+			}
+			v.HasSecret = cfg.SecretEnc != ""
+		}
 	}
 	return v
 }
 
+// maskSecret keeps a short prefix (e.g. to tell Twilio accounts apart in a
+// list) and replaces the rest with asterisks.
+func maskSecret(v string) string {
+	if len(v) <= 4 {
+		return v
+	}
+	return v[:4] + strings.Repeat("*", len(v)-4)
+}
+
 type channelInput struct {
-	Name   string  `json:"name"`
-	Type   string  `json:"type"`
-	URL    string  `json:"url"`
-	Secret *string `json:"secret"` // nil keeps the existing secret on update; "" clears it
+	Name string `json:"name"`
+	Type string `json:"type"`
+
+	URL string `json:"url"` // webhook
+
+	SMTPHost string `json:"smtp_host"` // email
+	SMTPPort int    `json:"smtp_port"` // email
+	Username string `json:"username"`  // email
+
+	AccountSID string `json:"account_sid"` // sms
+
+	From string   `json:"from"` // email, sms
+	To   []string `json:"to"`   // email, sms
+
+	// Secret is the one secret a channel type needs: the webhook signing
+	// secret, the SMTP password, or the Twilio auth token. nil keeps the
+	// existing secret on update (ignored on a type change); "" clears it.
+	Secret *string `json:"secret"`
 }
 
 func (s *Server) listChannels(w http.ResponseWriter, _ *http.Request) {
@@ -63,46 +105,146 @@ func (s *Server) listChannels(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, out)
 }
 
-// buildConfig validates the input and returns the stored config JSON. prev is
-// the existing config (empty on create).
-func (s *Server) buildConfig(in *channelInput, prev string) (string, error) {
+// buildConfig validates the input and returns the stored config JSON.
+// prevType/prev are the channel's existing type/config (both empty on
+// create). A type change starts from a blank config rather than merging the
+// old type's fields, since they don't mean anything under the new type.
+func (s *Server) buildConfig(in *channelInput, prevType, prev string) (string, error) {
 	in.Name = strings.TrimSpace(in.Name)
 	if in.Name == "" || len(in.Name) > maxTitle {
 		return "", errors.New("name is required (max 200 characters)")
 	}
 	if in.Type == "" {
-		in.Type = "webhook"
+		if prevType != "" {
+			in.Type = prevType
+		} else {
+			in.Type = "webhook"
+		}
 	}
-	if in.Type != "webhook" {
-		return "", errors.New("type must be webhook")
+	sameType := in.Type == prevType
+	switch in.Type {
+	case "webhook":
+		return s.buildWebhookConfig(in, sameType, prev)
+	case "email":
+		return s.buildEmailConfig(in, sameType, prev)
+	case "sms":
+		return s.buildSMSConfig(in, sameType, prev)
+	default:
+		return "", errors.New("type must be webhook, email, or sms")
 	}
+}
+
+// sealSecret resolves the stored (encrypted) secret from the input: nil
+// keeps prevEnc, "" clears it, anything else is sealed fresh.
+func (s *Server) sealSecret(in *channelInput, prevEnc string) (string, error) {
+	if in.Secret == nil {
+		return prevEnc, nil
+	}
+	if *in.Secret == "" {
+		return "", nil
+	}
+	if len(*in.Secret) > 512 {
+		return "", errors.New("secret is too long")
+	}
+	if s.Sealer == nil {
+		return "", errors.New("secrets are not enabled")
+	}
+	enc, err := s.Sealer.Seal(*in.Secret)
+	if err != nil {
+		return "", errors.New("could not encrypt secret")
+	}
+	return enc, nil
+}
+
+func (s *Server) buildWebhookConfig(in *channelInput, sameType bool, prev string) (string, error) {
 	var cfg notify.WebhookConfig
-	if prev != "" {
+	if sameType && prev != "" {
 		_ = json.Unmarshal([]byte(prev), &cfg)
 	}
-	if in.URL != "" || prev == "" {
+	if in.URL != "" || cfg.URL == "" {
 		if err := notify.ValidateURL(in.URL); err != nil {
 			return "", err
 		}
 		cfg.URL = in.URL
 	}
-	if in.Secret != nil {
-		if *in.Secret == "" {
-			cfg.SecretEnc = ""
-		} else {
-			if len(*in.Secret) > 512 {
-				return "", errors.New("secret is too long")
-			}
-			if s.Sealer == nil {
-				return "", errors.New("secrets are not enabled")
-			}
-			enc, err := s.Sealer.Seal(*in.Secret)
-			if err != nil {
-				return "", errors.New("could not encrypt secret")
-			}
-			cfg.SecretEnc = enc
-		}
+	enc, err := s.sealSecret(in, cfg.SecretEnc)
+	if err != nil {
+		return "", err
 	}
+	cfg.SecretEnc = enc
+	b, _ := json.Marshal(cfg)
+	return string(b), nil
+}
+
+func (s *Server) buildEmailConfig(in *channelInput, sameType bool, prev string) (string, error) {
+	var cfg notify.EmailConfig
+	if sameType && prev != "" {
+		_ = json.Unmarshal([]byte(prev), &cfg)
+	}
+	if in.SMTPHost != "" || cfg.SMTPHost == "" {
+		if in.SMTPHost == "" {
+			return "", errors.New("smtp_host is required")
+		}
+		cfg.SMTPHost = in.SMTPHost
+	}
+	if in.SMTPPort != 0 || cfg.SMTPPort == 0 {
+		if in.SMTPPort <= 0 || in.SMTPPort > 65535 {
+			return "", errors.New("smtp_port must be between 1 and 65535")
+		}
+		cfg.SMTPPort = in.SMTPPort
+	}
+	if in.Username != "" {
+		cfg.Username = in.Username
+	}
+	if in.From != "" || cfg.From == "" {
+		if in.From == "" {
+			return "", errors.New("from is required")
+		}
+		cfg.From = in.From
+	}
+	if in.To != nil || len(cfg.To) == 0 {
+		if len(in.To) == 0 {
+			return "", errors.New("to is required")
+		}
+		cfg.To = in.To
+	}
+	enc, err := s.sealSecret(in, cfg.PasswordEnc)
+	if err != nil {
+		return "", err
+	}
+	cfg.PasswordEnc = enc
+	b, _ := json.Marshal(cfg)
+	return string(b), nil
+}
+
+func (s *Server) buildSMSConfig(in *channelInput, sameType bool, prev string) (string, error) {
+	var cfg notify.SMSConfig
+	if sameType && prev != "" {
+		_ = json.Unmarshal([]byte(prev), &cfg)
+	}
+	if in.AccountSID != "" || cfg.AccountSID == "" {
+		if in.AccountSID == "" {
+			return "", errors.New("account_sid is required")
+		}
+		cfg.AccountSID = in.AccountSID
+	}
+	if in.From != "" || cfg.From == "" {
+		if in.From == "" {
+			return "", errors.New("from is required")
+		}
+		cfg.From = in.From
+	}
+	if in.To != nil || len(cfg.To) == 0 {
+		if len(in.To) == 0 {
+			return "", errors.New("to is required")
+		}
+		cfg.To = in.To
+	}
+	enc, err := s.sealSecret(in, cfg.AuthTokenEnc)
+	if err != nil {
+		return "", err
+	}
+	cfg.AuthTokenEnc = enc
 	b, _ := json.Marshal(cfg)
 	return string(b), nil
 }
@@ -112,7 +254,7 @@ func (s *Server) createChannel(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &in) {
 		return
 	}
-	cfg, err := s.buildConfig(&in, "")
+	cfg, err := s.buildConfig(&in, "", "")
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "bad_request", err.Error())
 		return
@@ -134,7 +276,7 @@ func (s *Server) updateChannel(w http.ResponseWriter, r *http.Request) {
 	if !s.find(w, &c, chi.URLParam(r, "id")) {
 		return
 	}
-	cfg, err := s.buildConfig(&in, c.Config)
+	cfg, err := s.buildConfig(&in, c.Type, c.Config)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "bad_request", err.Error())
 		return

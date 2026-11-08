@@ -145,7 +145,11 @@ func main() {
 
 	qsvc := query.NewService(g, store, eng, ql)
 	sealer := notify.NewSealer(cfg.JWTSecret)
-	notifier := &notify.Webhook{Sealer: sealer}
+	notifier := &notify.Router{
+		Webhook: &notify.Webhook{Sealer: sealer},
+		Email:   &notify.Email{Sealer: sealer},
+		SMS:     &notify.SMS{Sealer: sealer},
+	}
 	rl := &ruler.Ruler{
 		DB: g, Notifier: notifier, Log: log,
 		Query: func(ctx context.Context, req query.MetricRequest) (*query.MetricResult, error) {

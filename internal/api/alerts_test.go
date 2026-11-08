@@ -112,6 +112,51 @@ func TestChannelsAndRulesAPI(t *testing.T) {
 	require.Equal(t, 204, e.do("DELETE", "/api/v1/channels/"+ch.ID, admin, nil).Code)
 }
 
+func TestEmailAndSMSChannelsAPI(t *testing.T) {
+	e := newEnv(t)
+	e.srv.Sealer = notify.NewSealer("test-secret")
+	e.h = NewRouter(e.srv)
+	admin := e.userToken(models.RoleAdmin)
+
+	// Email: missing smtp_host is rejected.
+	require.Equal(t, 400, e.do("POST", "/api/v1/channels", admin, map[string]any{
+		"name": "e", "type": "email", "from": "a@b.io", "to": []string{"c@d.io"},
+	}).Code)
+
+	rec := e.do("POST", "/api/v1/channels", admin, map[string]any{
+		"name": "ops-email", "type": "email", "smtp_host": "smtp.example.com", "smtp_port": 587,
+		"username": "argus", "from": "alerts@argus.local", "to": []string{"oncall@example.com"}, "secret": "hunter2",
+	})
+	require.Equal(t, 201, rec.Code, rec.Body.String())
+	require.NotContains(t, rec.Body.String(), "hunter2")
+	ch := decodeBody[channelView](t, rec.Body.Bytes())
+	require.Equal(t, "email", ch.Type)
+	require.Equal(t, "smtp.example.com", ch.SMTPHost)
+	require.Equal(t, "alerts@argus.local", ch.From)
+	require.Equal(t, []string{"oncall@example.com"}, ch.To)
+	require.True(t, ch.HasSecret)
+
+	var raw models.NotificationChannel
+	require.NoError(t, e.srv.DB.First(&raw, "id = ?", ch.ID).Error)
+	require.NotContains(t, raw.Config, "hunter2", "secret is stored encrypted")
+
+	// SMS: missing account_sid is rejected.
+	require.Equal(t, 400, e.do("POST", "/api/v1/channels", admin, map[string]any{
+		"name": "s", "type": "sms", "from": "+15550000000", "to": []string{"+15551111111"},
+	}).Code)
+
+	rec = e.do("POST", "/api/v1/channels", admin, map[string]any{
+		"name": "ops-sms", "type": "sms", "account_sid": "AC1234567890", "from": "+15550000000",
+		"to": []string{"+15551111111"}, "secret": "authtoken",
+	})
+	require.Equal(t, 201, rec.Code, rec.Body.String())
+	require.NotContains(t, rec.Body.String(), "authtoken")
+	sms := decodeBody[channelView](t, rec.Body.Bytes())
+	require.Equal(t, "sms", sms.Type)
+	require.Equal(t, "AC12********", sms.AccountSID, "account SID is masked after 4 characters")
+	require.True(t, sms.HasSecret)
+}
+
 func TestChannelTestReportsFailure(t *testing.T) {
 	e := newEnv(t)
 	e.srv.Sealer = notify.NewSealer("test-secret")

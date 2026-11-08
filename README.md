@@ -12,6 +12,22 @@ go run ./cmd/argus
 
 `.env` is picked up from the working directory or any parent. Real environment variables win over `.env`.
 
+## Local dev environment (Nix)
+
+`flake.nix` provides two dev shells and a one-command local environment:
+
+```
+nix develop                 # Go + Node 22 + process-compose, for running pieces by hand
+nix develop .#testapp       # Go only, for working on testapp in isolation
+nix run .#dev-env           # builds the web client, then runs everything via process-compose
+```
+
+`nix run .#dev-env` builds the Expo web client (`cd app && npm ci && npm run build:web`, skipped if `internal/webui/dist/index.html` already exists; force a rebuild with `ARGUS_REBUILD_CLIENT=1`), then starts `process-compose up --no-server`, which runs Argus (readiness-probed on `/healthz`), mints a testapp API key against the real auth/API-key endpoints (`scripts/dev/mint-key.sh`, writes `testapp/.env.generated`), starts testapp wired to that key, and leaves an optional traffic generator disabled by default (toggle it from the process-compose TUI).
+
+With [direnv](https://direnv.net/) installed, `.envrc` (and `testapp/.envrc`) run `use flake` automatically on `cd`.
+
+Not covered by this setup: the Expo native dev loop (`npx expo start`, for iOS/Android) is still run by hand from `app/`; database migrations aren't orchestrated separately, since `go run ./cmd/argus` applies them on boot.
+
 ## Ingest (Phase 2)
 
 `POST /api/v1/ingest/push` with header `X-Argus-Key: <api key>` (mint one via `POST /api/v1/api-keys` as admin).

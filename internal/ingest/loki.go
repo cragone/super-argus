@@ -174,7 +174,7 @@ const maxLokiStreams = 10000
 func decodePushJSON(raw []byte) ([]lokiStream, error) {
 	var in struct {
 		Streams []struct {
-			Stream map[string]string `json:"stream"`
+			Stream map[string]string   `json:"stream"`
 			Values [][]json.RawMessage `json:"values"`
 		} `json:"streams"`
 	}

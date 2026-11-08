@@ -21,9 +21,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/cragone/Super-Argus/sdk/go/argus"
 	"github.com/cragone/Super-Argus/testapp/internal/app"
 	"github.com/cragone/Super-Argus/testapp/internal/dotenv"
-	"github.com/cragone/Super-Argus/sdk/go/argus"
 	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"

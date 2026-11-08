@@ -37,6 +37,9 @@ export function PanelCard({ panel, range, refreshMs }: { panel: Panel; range: Ti
 
   const metric = q.data?.kind === 'metric' ? q.data.metric : null;
   const series = useMemo(() => (metric ? foldSeries(toChartSeries(metric.series)) : []), [metric]);
+  // Mutating during render is intentional: slot assignment must stay stable across
+  // renders as series come and go, and `assign` is idempotent for an unchanged key set.
+  // eslint-disable-next-line react-hooks/refs
   const slots = assigner.current.assign(series.map((s) => s.key));
   const chartPanel = panel.type === 'timeseries';
 

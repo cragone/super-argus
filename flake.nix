@@ -1,5 +1,5 @@
 {
-  description = "super-argus local dev environment";
+  description = "super-argus local dev environment, plus a nixosModules.default for deploying the server + agent";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -62,5 +62,10 @@
             '';
           }}/bin/argus-dev-env";
         };
-      });
+      }) // {
+        # `services.argus` (server + agent, with `host`/`port`/etc. options) --
+        # see nix/module.nix. Not per-system: NixOS modules are evaluated
+        # against whatever system the importing host is.
+        nixosModules.default = import ./nix/module.nix { argusSrc = self; };
+      };
 }

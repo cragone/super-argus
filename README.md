@@ -198,7 +198,7 @@ An alert rule runs a **metric query** on a schedule and compares its latest valu
   - All three: three attempts with 1s and 2s backoff on retryable failures (network errors and `5xx`/`429` for webhook/sms; `4xx` for email, per SMTP's convention above); non-retryable failures fail at once.
 - **Channels** are admin-managed. Secrets are encrypted at rest (AES-GCM, key derived from `ARGUS_JWT_SECRET`, so **changing the JWT secret invalidates stored channel secrets**). The API never returns a plaintext secret: webhook shows only the URL's host and `has_secret`; email shows the SMTP host/from/to; sms shows from/to and the account SID masked after its first 4 characters.
 - **API** (`/api/v1`): viewers read `/alert-rules`, `/alert-events`; editors write `/alert-rules` and list `/channels`; admins write `/channels` and call `POST /channels/{id}/test`.
-- **In the app:** an **Alerts** tab (rules with state badges, last value, enable/disable, editor, history) and a *Notification channels* card in **Settings** for admins. The app's channel editor UI has not been updated for the `email`/`sms` fields yet; use the API directly for those until it has.
+- **In the app:** an **Alerts** tab (rules with state badges, last value, enable/disable, editor, history) and a *Notification channels* card in **Settings** for admins, with a type selector (webhook/email/sms) and the matching fields for each.
 
 Limitations: Slack and push notifications are still Phase 10 stretch goals. Rule evaluation uses the shared `ruler` query user, so it counts against that user's concurrency limit. The ruler runs inside the server process; run one server per data directory.
 

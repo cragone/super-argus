@@ -218,6 +218,66 @@ func TestDisabledRuleResetsAndErrorsKeepState(t *testing.T) {
 	require.Equal(t, []string{"firing"}, h.statuses())
 }
 
+// fakeNotifier records every channel it was asked to deliver to, regardless
+// of type, so tests can confirm the ruler treats email/sms channels exactly
+// like webhook ones instead of special-casing a single type.
+type fakeNotifier struct {
+	mu   sync.Mutex
+	sent []models.NotificationChannel
+}
+
+func (f *fakeNotifier) Send(_ context.Context, ch models.NotificationChannel, _ notify.Payload) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.sent = append(f.sent, ch)
+	return nil
+}
+
+func (f *fakeNotifier) types() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	out := make([]string, len(f.sent))
+	for i, c := range f.sent {
+		out[i] = c.Type
+	}
+	return out
+}
+
+func TestFiresThroughEmailAndSMSChannels(t *testing.T) {
+	g, err := db.Open("sqlite:" + filepath.Join(t.TempDir(), "t.db"))
+	require.NoError(t, err)
+	require.NoError(t, db.Migrate(g))
+	sqlDB, _ := g.DB()
+	t.Cleanup(func() { _ = sqlDB.Close() })
+
+	emailCfg, _ := json.Marshal(notify.EmailConfig{SMTPHost: "smtp.example.com", SMTPPort: 587, From: "alerts@example.com", To: []string{"oncall@example.com"}})
+	emailCh := models.NotificationChannel{Name: "email", Type: "email", Config: string(emailCfg)}
+	require.NoError(t, g.Create(&emailCh).Error)
+
+	smsCfg, _ := json.Marshal(notify.SMSConfig{AccountSID: "ACxxxx", From: "+15550000000", To: []string{"+15551111111"}})
+	smsCh := models.NotificationChannel{Name: "sms", Type: "sms", Config: string(smsCfg)}
+	require.NoError(t, g.Create(&smsCh).Error)
+
+	ids, _ := json.Marshal([]string{emailCh.ID, smsCh.ID})
+	rule := models.AlertRule{
+		OwnerID: "u", Name: "errors", Query: `count_over_time({service="api"}[5m])`, Comparator: "gt", Threshold: 10,
+		Window: "5m", ForDuration: "0s", Cooldown: "0s", Severity: "critical", Enabled: true, NotifyChannelIDs: string(ids),
+	}
+	require.NoError(t, Validate(&rule))
+	require.NoError(t, g.Create(&rule).Error)
+
+	fn := &fakeNotifier{}
+	r := &Ruler{
+		DB: g, Notifier: fn, Now: func() time.Time { return time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC) },
+		Query: func(context.Context, query.MetricRequest) (*query.MetricResult, error) {
+			return &query.MetricResult{Series: []query.Series{{Points: []query.Point{{T: 1, V: 50}}}}}, nil
+		},
+	}
+	r.Tick(context.Background()) // breach, no for_duration -> fires on this tick
+
+	require.ElementsMatch(t, []string{"email", "sms"}, fn.types(), "one delivery per non-webhook channel on firing")
+}
+
 func TestReduce(t *testing.T) {
 	res := &query.MetricResult{Series: []query.Series{
 		{Points: []query.Point{{V: 1}, {V: 3}}}, {Points: []query.Point{{V: 9}}}, {},

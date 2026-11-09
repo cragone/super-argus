@@ -210,7 +210,8 @@ func (r *Ruler) dispatch(f func()) {
 	f()
 }
 
-// Payload builds the webhook body for a rule and event state.
+// Payload builds the notification payload for a rule and event state, shared
+// by every channel type (webhook, email, sms).
 func Payload(rule *models.AlertRule, status string, value float64, at time.Time) notify.Payload {
 	return notify.Payload{
 		Status: status, RuleID: rule.ID, RuleName: rule.Name, Severity: rule.Severity,

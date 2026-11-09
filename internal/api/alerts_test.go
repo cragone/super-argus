@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/cragone/Super-Argus/internal/models"
 	"github.com/cragone/Super-Argus/internal/notify"
@@ -170,4 +171,27 @@ func TestChannelTestReportsFailure(t *testing.T) {
 	rec = e.do("POST", "/api/v1/channels/"+ch.ID+"/test", admin, nil)
 	require.Equal(t, 200, rec.Code)
 	require.Contains(t, rec.Body.String(), `"ok":false`)
+}
+
+// TestChannelTestWorksForEmailChannels confirms /channels/{id}/test is not
+// accidentally webhook-only: it must dispatch an email-typed channel through
+// the Email sender (not just the Router's "no sender configured" guard).
+func TestChannelTestWorksForEmailChannels(t *testing.T) {
+	e := newEnv(t)
+	e.srv.Sealer = notify.NewSealer("test-secret")
+	e.srv.Notifier = &notify.Router{Email: &notify.Email{Sealer: e.srv.Sealer, Attempts: 1, Sleep: func(time.Duration) {}}}
+	e.h = NewRouter(e.srv)
+	admin := e.userToken(models.RoleAdmin)
+
+	rec := e.do("POST", "/api/v1/channels", admin, map[string]any{
+		"name": "ops-email", "type": "email", "smtp_host": "127.0.0.1", "smtp_port": 1, // nothing listens here
+		"from": "alerts@argus.local", "to": []string{"oncall@example.com"},
+	})
+	require.Equal(t, 201, rec.Code, rec.Body.String())
+	ch := decodeBody[channelView](t, rec.Body.Bytes())
+
+	rec = e.do("POST", "/api/v1/channels/"+ch.ID+"/test", admin, nil)
+	require.Equal(t, 200, rec.Code)
+	require.Contains(t, rec.Body.String(), `"ok":false`, "a dial failure, not a nil-sender error, confirms the Email sender was actually reached")
+	require.NotContains(t, rec.Body.String(), "no email sender configured")
 }

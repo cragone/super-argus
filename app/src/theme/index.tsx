@@ -1,4 +1,4 @@
-import { useColorScheme } from 'react-native';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 
 export interface Palette {
   bg: string;
@@ -41,7 +41,7 @@ export const dark: Palette = {
 
 /** Palette for the current system appearance. */
 export function useTheme(): Palette {
-  return useColorScheme() === 'dark' ? dark : light;
+  return useMediaQuery('(prefers-color-scheme: dark)') ? dark : light;
 }
 
 export const mono = { fontFamily: 'Menlo, Consolas, "Roboto Mono", monospace' } as const;

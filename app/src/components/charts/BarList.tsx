@@ -1,5 +1,3 @@
-import { Text, View } from 'react-native';
-
 import { formatValue, lastValue, type ChartSeries } from '@/lib/chart';
 import { useChartColors } from '@/theme/chartColors';
 
@@ -26,15 +24,15 @@ export function BarList({ items, format = formatValue }: { items: BarItem[]; for
   const c = useChartColors();
   const max = Math.max(...items.map((i) => i.value), 0);
   return (
-    <View style={{ gap: 10 }} accessibilityRole="list">
+    <div role="list" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       {items.map((it) => (
-        <View key={it.key} accessibilityRole="text" accessibilityLabel={`${it.label}: ${format(it.value)}`}>
-          <Text numberOfLines={1} style={{ color: c.inkSecondary, fontSize: 12, marginBottom: 3 }}>
+        <div key={it.key} role="text" aria-label={`${it.label}: ${format(it.value)}`}>
+          <div style={{ color: c.inkSecondary, fontSize: 12, marginBottom: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {it.label}
-          </Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <View style={{ flex: 1, height: 16, justifyContent: 'center' }}>
-              <View
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ flex: 1, height: 16, display: 'flex', alignItems: 'center' }}>
+              <div
                 style={{
                   width: `${max > 0 ? Math.max(2, (it.value / max) * 100) : 0}%`,
                   height: 16,
@@ -43,11 +41,11 @@ export function BarList({ items, format = formatValue }: { items: BarItem[]; for
                   borderBottomRightRadius: 4,
                 }}
               />
-            </View>
-            <Text style={{ color: c.ink, fontSize: 12, fontWeight: '700', minWidth: 44, textAlign: 'right' }}>{format(it.value)}</Text>
-          </View>
-        </View>
+            </div>
+            <span style={{ color: c.ink, fontSize: 12, fontWeight: 700, minWidth: 44, textAlign: 'right' }}>{format(it.value)}</span>
+          </div>
+        </div>
       ))}
-    </View>
+    </div>
   );
 }

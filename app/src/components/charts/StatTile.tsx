@@ -1,8 +1,5 @@
-import { useState } from 'react';
-import { Text, View, type LayoutChangeEvent } from 'react-native';
-import Svg, { Circle, Path } from 'react-native-svg';
-
 import { formatValue, lastValue, type ChartSeries } from '@/lib/chart';
+import { useElementWidth } from '@/hooks/useElementWidth';
 import { useChartColors } from '@/theme/chartColors';
 
 /** Total of the newest value across series (a stat panel normally has one series). */
@@ -17,7 +14,7 @@ export function statValue(series: ChartSeries[]): number | null {
  */
 export function StatTile({ series, format = formatValue, height = 36 }: { series: ChartSeries[]; format?: (v: number) => string; height?: number }) {
   const c = useChartColors();
-  const [w, setW] = useState(0);
+  const [ref, w] = useElementWidth<HTMLDivElement>();
   const value = statValue(series);
 
   // Sum the series pointwise for the sparkline.
@@ -32,16 +29,16 @@ export function StatTile({ series, format = formatValue, height = 36 }: { series
   const d = pts.map((p, i) => `${i ? 'L' : 'M'} ${x(i).toFixed(1)} ${y(p[1]).toFixed(1)}`).join(' ');
 
   return (
-    <View onLayout={(e: LayoutChangeEvent) => setW(Math.floor(e.nativeEvent.layout.width))}>
-      <Text accessibilityLabel={`Value ${value === null ? 'no data' : format(value)}`} style={{ color: c.ink, fontSize: 34, fontWeight: '600' }}>
+    <div ref={ref}>
+      <span aria-label={`Value ${value === null ? 'no data' : format(value)}`} style={{ color: c.ink, fontSize: 34, fontWeight: 600, display: 'block' }}>
         {value === null ? '-' : format(value)}
-      </Text>
+      </span>
       {w > 0 && pts.length > 1 && (
-        <Svg width={w} height={height} style={{ marginTop: 6 }}>
-          <Path d={d} stroke={c.deEmphasis} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" fill="none" />
-          <Circle cx={x(pts.length - 1)} cy={y(pts[pts.length - 1][1])} r={4} fill={c.categorical[0]} stroke={c.surface} strokeWidth={2} />
-        </Svg>
+        <svg width={w} height={height} style={{ marginTop: 6, display: 'block' }}>
+          <path d={d} stroke={c.deEmphasis} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" fill="none" />
+          <circle cx={x(pts.length - 1)} cy={y(pts[pts.length - 1][1])} r={4} fill={c.categorical[0]} stroke={c.surface} strokeWidth={2} />
+        </svg>
       )}
-    </View>
+    </div>
   );
 }

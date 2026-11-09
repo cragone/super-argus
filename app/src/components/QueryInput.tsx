@@ -1,5 +1,4 @@
-import { useMemo, useState } from 'react';
-import { ScrollView, TextInput, View, type TextInputSelectionChangeEvent } from 'react-native';
+import { useMemo, useState, type KeyboardEvent } from 'react';
 
 import { applySuggestion, filterSuggestions, getContext } from '@/lib/autocomplete';
 import { useLabelNames, useLabelValues } from '@/hooks/useLogs';
@@ -37,45 +36,49 @@ export function QueryInput({
     setCursor(r.cursor);
   };
 
+  const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      onSubmit();
+    }
+  };
+
   return (
-    <View>
-      <TextInput
-        accessibilityLabel="Query"
+    <div>
+      <textarea
+        aria-label="Query"
         value={value}
-        onChangeText={onChange}
-        onSelectionChange={(e: TextInputSelectionChangeEvent) =>
-          setCursor(e.nativeEvent.selection.end)
-        }
-        onSubmitEditing={onSubmit}
+        onChange={(e) => onChange(e.target.value)}
+        onSelect={(e) => setCursor(e.currentTarget.selectionEnd)}
+        onKeyDown={onKeyDown}
         placeholder={'{service="api"} |= "error"'}
-        placeholderTextColor={t.textDim}
         autoCapitalize="none"
-        autoCorrect={false}
+        autoCorrect="off"
         spellCheck={false}
-        multiline
-        style={[
-          mono,
-          {
-            minHeight: 44,
-            maxHeight: 120,
-            color: t.text,
-            backgroundColor: t.surface,
-            borderColor: t.border,
-            borderWidth: 1,
-            borderRadius: 8,
-            paddingHorizontal: 10,
-            paddingVertical: 8,
-            fontSize: 14,
-          },
-        ]}
+        style={{
+          ...mono,
+          display: 'block',
+          width: '100%',
+          minHeight: 44,
+          maxHeight: 120,
+          resize: 'vertical',
+          color: t.text,
+          backgroundColor: t.surface,
+          borderColor: t.border,
+          borderWidth: 1,
+          borderStyle: 'solid',
+          borderRadius: 8,
+          padding: '8px 10px',
+          fontSize: 14,
+        }}
       />
       {suggestions.length > 0 && (
-        <ScrollView horizontal keyboardShouldPersistTaps="always" showsHorizontalScrollIndicator={false} style={{ marginTop: 6 }}>
+        <div style={{ display: 'flex', overflowX: 'auto', marginTop: 6 }}>
           {suggestions.map((s) => (
             <Chip key={s} label={s} accessibilityLabel={`Insert ${s}`} onPress={() => pick(s)} />
           ))}
-        </ScrollView>
+        </div>
       )}
-    </View>
+    </div>
   );
 }

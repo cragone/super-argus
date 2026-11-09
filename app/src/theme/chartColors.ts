@@ -1,4 +1,4 @@
-import { useColorScheme } from 'react-native';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 
 /**
  * Chart colors: the validated reference palette from the dataviz skill.
@@ -47,7 +47,7 @@ const DARK: ChartColors = {
 export const chartPalettes = { light: LIGHT, dark: DARK };
 
 export function useChartColors(): ChartColors {
-  return useColorScheme() === 'dark' ? DARK : LIGHT;
+  return useMediaQuery('(prefers-color-scheme: dark)') ? DARK : LIGHT;
 }
 
 /**

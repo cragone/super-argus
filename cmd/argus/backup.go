@@ -17,6 +17,10 @@ const usage = `usage: argus [command]
   (no command)       run the server
   backup <dir>       copy the data directory to <dir> while the server runs
                      (incremental: run it again to the same <dir> to update it)
+  tui                process-compose dashboard tailing the argus/argus-agent
+                     systemd logs side by side (needs process-compose on PATH;
+                     read-only monitoring, not process control -- use systemctl
+                     to actually restart a service)
 `
 
 // runCommand runs a subcommand and returns the process exit code.
@@ -24,6 +28,8 @@ func runCommand(name string, args []string, log *slog.Logger) int {
 	switch name {
 	case "backup":
 		return runBackup(args, log)
+	case "tui":
+		return runTUI(args, log)
 	case "help", "-h", "--help":
 		fmt.Print(usage)
 		return 0

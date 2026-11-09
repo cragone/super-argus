@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
-import { Platform, StyleSheet, View } from 'react-native';
+
+import owlEyeUrl from '../../assets/owl-eye.jpg';
 
 // Where the pupil sits in owl-eye.jpg (643x360), as a fraction of the image.
 // The picture is positioned so this point lands in the middle of the screen.
@@ -64,13 +65,12 @@ function draw(canvas: HTMLCanvasElement, img: HTMLImageElement, w: number, h: nu
   }
 }
 
-/** Full-screen colour ASCII rendering of the owl eye, web only. Sits behind its siblings. */
+/** Full-screen colour ASCII rendering of the owl eye. Sits behind its siblings. */
 export function AsciiOwl() {
-  const host = useRef<unknown>(null);
+  const host = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    if (Platform.OS !== 'web') return;
-    const el = host.current as unknown as HTMLElement | null;
+    const el = host.current;
     if (!el) return;
     const canvas = document.createElement('canvas');
     el.appendChild(canvas);
@@ -84,9 +84,7 @@ export function AsciiOwl() {
       timer = setTimeout(render, 80);
     };
     img.onload = render;
-    // react-native-web has no Image.resolveAssetSource; its bundler resolves an image module to { uri, width, height }.
-    const mod: unknown = require('../../assets/owl-eye.jpg');
-    img.src = typeof mod === 'string' ? mod : ((mod as { uri?: string } | null)?.uri ?? '');
+    img.src = owlEyeUrl;
     window.addEventListener('resize', onResize);
     return () => {
       clearTimeout(timer);
@@ -95,6 +93,10 @@ export function AsciiOwl() {
     };
   }, []);
 
-  if (Platform.OS !== 'web') return null;
-  return <View ref={host as never} pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: '#07060a' }]} />;
+  return (
+    <div
+      ref={host}
+      style={{ position: 'absolute', inset: 0, backgroundColor: '#07060a', pointerEvents: 'none' }}
+    />
+  );
 }

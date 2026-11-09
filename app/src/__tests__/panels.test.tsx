@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen } from '@testing-library/react';
 import type { ReactElement } from 'react';
+import { vi } from 'vitest';
 
 import { BarList, barItems } from '@/components/charts/BarList';
 import { Legend } from '@/components/charts/Legend';
@@ -55,57 +56,57 @@ describe('top-N and stat helpers', () => {
 });
 
 describe('chart components', () => {
-  it('renders ranked bars with accessible values', async () => {
-    await render(<BarList items={[{ key: 'a', label: '/v1/items', value: 18 }, { key: 'b', label: '/v1/users', value: 5 }]} />);
+  it('renders ranked bars with accessible values', () => {
+    render(<BarList items={[{ key: 'a', label: '/v1/items', value: 18 }, { key: 'b', label: '/v1/users', value: 5 }]} />);
     expect(screen.getByLabelText('/v1/items: 18')).toBeTruthy();
     expect(screen.getByLabelText('/v1/users: 5')).toBeTruthy();
   });
 
-  it('shows a legend only for two or more series', async () => {
-    const one = await render(<Legend series={[mk('a', [])]} slots={[0]} />);
+  it('shows a legend only for two or more series', () => {
+    const one = render(<Legend series={[mk('a', [])]} slots={[0]} />);
     expect(screen.queryByText('a')).toBeNull();
-    await one.unmount();
-    await render(<Legend series={[mk('a', []), mk('b', [])]} slots={[0, 1]} />);
+    one.unmount();
+    render(<Legend series={[mk('a', []), mk('b', [])]} slots={[0, 1]} />);
     expect(screen.getByText('a')).toBeTruthy();
     expect(screen.getByText('b')).toBeTruthy();
   });
 
-  it('shows the stat value, or a dash without data', async () => {
-    const r = await render(<StatTile series={[mk('a', [[1, 12900]])]} />);
+  it('shows the stat value, or a dash without data', () => {
+    const r = render(<StatTile series={[mk('a', [[1, 12900]])]} />);
     expect(screen.getByLabelText('Value 12.9K')).toBeTruthy();
-    await r.unmount();
-    await render(<StatTile series={[]} />);
+    r.unmount();
+    render(<StatTile series={[]} />);
     expect(screen.getByLabelText('Value no data')).toBeTruthy();
   });
 });
 
 describe('PanelForm', () => {
   it('requires a title and a query', async () => {
-    const onSubmit = jest.fn().mockResolvedValue(undefined);
-    await render(withClient(<PanelForm submitLabel="Add panel" onSubmit={onSubmit} onCancel={() => {}} />));
-    await fireEvent.press(screen.getByLabelText('Add panel'));
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    render(withClient(<PanelForm submitLabel="Add panel" onSubmit={onSubmit} onCancel={() => {}} />));
+    fireEvent.click(screen.getByLabelText('Add panel'));
     expect(screen.getByText('Give the panel a title')).toBeTruthy();
-    await fireEvent.changeText(screen.getByLabelText('Panel title'), 'Errors');
-    await fireEvent.press(screen.getByLabelText('Add panel'));
+    fireEvent.change(screen.getByLabelText('Panel title'), { target: { value: 'Errors' } });
+    fireEvent.click(screen.getByLabelText('Add panel'));
     expect(screen.getByText('Enter a query')).toBeTruthy();
     expect(onSubmit).not.toHaveBeenCalled();
   });
 
   it('submits trimmed values and keeps options; logs panels drop the step', async () => {
-    const onSubmit = jest.fn().mockResolvedValue(undefined);
-    await render(
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    render(
       withClient(
         <PanelForm initial={{ title: ' T ', type: 'logs', query: ' {a="b"} ', step: '30s', options: { width: 'full' }, position: 3 }} submitLabel="Save" onSubmit={onSubmit} onCancel={() => {}} />,
       ),
     );
-    await fireEvent.press(screen.getByLabelText('Save'));
+    fireEvent.click(screen.getByLabelText('Save'));
     expect(onSubmit).toHaveBeenCalledWith({ title: 'T', type: 'logs', query: '{a="b"}', step: '', options: { width: 'full' }, position: 3 });
   });
 
   it('shows the server error and stays open', async () => {
-    const onSubmit = jest.fn().mockRejectedValue(new Error('syntax error at position 0'));
-    await render(withClient(<PanelForm initial={{ title: 'T', type: 'timeseries', query: '{a="b"}' }} submitLabel="Save" onSubmit={onSubmit} onCancel={() => {}} />));
-    await fireEvent.press(screen.getByLabelText('Save'));
+    const onSubmit = vi.fn().mockRejectedValue(new Error('syntax error at position 0'));
+    render(withClient(<PanelForm initial={{ title: 'T', type: 'timeseries', query: '{a="b"}' }} submitLabel="Save" onSubmit={onSubmit} onCancel={() => {}} />));
+    fireEvent.click(screen.getByLabelText('Save'));
     expect(await screen.findByText('syntax error at position 0')).toBeTruthy();
   });
 });

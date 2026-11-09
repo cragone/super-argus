@@ -1,5 +1,3 @@
-import { ScrollView, Text, View } from 'react-native';
-
 import { formatFullTime, formatValue, unionTimes, valueAt, type ChartSeries } from '@/lib/chart';
 import { useChartColors } from '@/theme/chartColors';
 
@@ -9,30 +7,36 @@ export function ChartTable({ series, rows = 30, format = formatValue }: { series
   const times = unionTimes(series).slice(-rows).reverse();
   const cols = series.slice(0, 8);
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator>
-      <View accessibilityRole="summary" accessibilityLabel="Data table">
-        <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: c.grid }}>
-          <Text style={{ width: 150, color: c.inkSecondary, fontSize: 11, paddingVertical: 4 }}>Time</Text>
-          {cols.map((s) => (
-            <Text key={s.key} numberOfLines={1} style={{ width: 90, color: c.inkSecondary, fontSize: 11, paddingVertical: 4, textAlign: 'right' }}>
-              {s.label}
-            </Text>
+    <div style={{ overflowX: 'auto' }}>
+      <table role="table" aria-label="Data table" style={{ borderCollapse: 'collapse' }}>
+        <thead>
+          <tr style={{ borderBottom: `1px solid ${c.grid}` }}>
+            <th style={{ width: 150, color: c.inkSecondary, fontSize: 11, fontWeight: 400, padding: '4px 0', textAlign: 'left' }}>Time</th>
+            {cols.map((s) => (
+              <th
+                key={s.key}
+                style={{ width: 90, color: c.inkSecondary, fontSize: 11, fontWeight: 400, padding: '4px 0', textAlign: 'right', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {s.label}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {times.map((t) => (
+            <tr key={t} style={{ borderBottom: `1px solid ${c.grid}` }}>
+              <td style={{ width: 150, color: c.inkSecondary, fontSize: 11, padding: '3px 0' }}>{formatFullTime(t)}</td>
+              {cols.map((s) => {
+                const v = valueAt(s, t);
+                return (
+                  <td key={s.key} style={{ width: 90, color: c.ink, fontSize: 11, padding: '3px 0', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                    {v === null ? '' : format(v)}
+                  </td>
+                );
+              })}
+            </tr>
           ))}
-        </View>
-        {times.map((t) => (
-          <View key={t} style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: c.grid }}>
-            <Text style={{ width: 150, color: c.inkSecondary, fontSize: 11, paddingVertical: 3 }}>{formatFullTime(t)}</Text>
-            {cols.map((s) => {
-              const v = valueAt(s, t);
-              return (
-                <Text key={s.key} style={{ width: 90, color: c.ink, fontSize: 11, paddingVertical: 3, textAlign: 'right', fontVariant: ['tabular-nums'] }}>
-                  {v === null ? '' : format(v)}
-                </Text>
-              );
-            })}
-          </View>
-        ))}
-      </View>
-    </ScrollView>
+        </tbody>
+      </table>
+    </div>
   );
 }

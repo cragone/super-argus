@@ -1,5 +1,4 @@
-import type { ReactNode } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import type { CSSProperties, ReactNode } from 'react';
 
 import { useTheme } from '@/theme';
 
@@ -16,30 +15,32 @@ export function Button({
   disabled?: boolean;
   loading?: boolean;
   variant?: 'primary' | 'ghost';
-  style?: StyleProp<ViewStyle>;
+  style?: CSSProperties;
 }) {
   const t = useTheme();
   const primary = variant === 'primary';
+  const isDisabled = !!disabled || !!loading;
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={title}
-      accessibilityState={{ disabled: !!disabled || !!loading }}
-      onPress={onPress}
-      disabled={disabled || loading}
-      style={({ pressed }) => [
-        styles.button,
-        { backgroundColor: primary ? t.accent : 'transparent', borderColor: primary ? t.accent : t.border },
-        (disabled || loading) && { opacity: 0.5 },
-        pressed && { opacity: 0.8 },
-        style,
-      ]}>
+    <button
+      type="button"
+      aria-label={title}
+      aria-disabled={isDisabled}
+      onClick={onPress}
+      disabled={isDisabled}
+      style={{
+        ...buttonStyle,
+        backgroundColor: primary ? t.accent : 'transparent',
+        borderColor: primary ? t.accent : t.border,
+        opacity: isDisabled ? 0.5 : 1,
+        cursor: isDisabled ? 'default' : 'pointer',
+        ...style,
+      }}>
       {loading ? (
-        <ActivityIndicator color={primary ? t.accentText : t.text} />
+        <span className="spinner" style={{ color: primary ? t.accentText : t.text }} />
       ) : (
-        <Text style={{ color: primary ? t.accentText : t.text, fontWeight: '600' }}>{title}</Text>
+        <span style={{ color: primary ? t.accentText : t.text, fontWeight: 600 }}>{title}</span>
       )}
-    </Pressable>
+    </button>
   );
 }
 
@@ -56,38 +57,71 @@ export function Chip({
 }) {
   const t = useTheme();
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel ?? label}
-      accessibilityState={{ selected: !!selected }}
-      onPress={onPress}
-      style={[
-        styles.chip,
-        { borderColor: selected ? t.accent : t.border, backgroundColor: selected ? t.accent : t.surfaceAlt },
-      ]}>
-      <Text style={{ color: selected ? t.accentText : t.text, fontSize: 13 }} numberOfLines={1}>
+    <button
+      type="button"
+      aria-label={accessibilityLabel ?? label}
+      aria-pressed={!!selected}
+      onClick={onPress}
+      style={{
+        ...chipStyle,
+        borderColor: selected ? t.accent : t.border,
+        backgroundColor: selected ? t.accent : t.surfaceAlt,
+        cursor: onPress ? 'pointer' : 'default',
+      }}>
+      <span
+        style={{
+          color: selected ? t.accentText : t.text,
+          fontSize: 13,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+        }}>
         {label}
-      </Text>
-    </Pressable>
+      </span>
+    </button>
   );
 }
 
-export function Card({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
+export function Card({ children, style }: { children: ReactNode; style?: CSSProperties }) {
   const t = useTheme();
-  return <View style={[styles.card, { backgroundColor: t.surface, borderColor: t.border }, style]}>{children}</View>;
+  return <div style={{ ...cardStyle, backgroundColor: t.surface, borderColor: t.border, ...style }}>{children}</div>;
 }
 
 export function ErrorText({ children }: { children: ReactNode }) {
   const t = useTheme();
   return (
-    <Text accessibilityRole="alert" style={{ color: t.danger }}>
+    <span role="alert" style={{ color: t.danger }}>
       {children}
-    </Text>
+    </span>
   );
 }
 
-const styles = StyleSheet.create({
-  button: { paddingVertical: 11, paddingHorizontal: 16, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  chip: { paddingVertical: 5, paddingHorizontal: 10, borderRadius: 14, borderWidth: 1, marginRight: 6, maxWidth: 260 },
-  card: { borderRadius: 10, borderWidth: 1, padding: 12 },
-});
+const buttonStyle: CSSProperties = {
+  padding: '11px 16px',
+  borderRadius: 8,
+  borderWidth: 1,
+  borderStyle: 'solid',
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  font: 'inherit',
+};
+
+const chipStyle: CSSProperties = {
+  padding: '5px 10px',
+  borderRadius: 14,
+  borderWidth: 1,
+  borderStyle: 'solid',
+  marginRight: 6,
+  maxWidth: 260,
+  display: 'inline-flex',
+  alignItems: 'center',
+  font: 'inherit',
+};
+
+const cardStyle: CSSProperties = {
+  borderRadius: 10,
+  borderWidth: 1,
+  borderStyle: 'solid',
+  padding: 12,
+};

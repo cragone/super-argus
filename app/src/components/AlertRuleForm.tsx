@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import { Text, TextInput, View } from 'react-native';
+import { useState, type CSSProperties } from 'react';
 
 import { errorMessage, type AlertRule, type AlertRuleInput, type Channel } from '@/api/client';
 import { COMPARATORS, SEVERITIES, validDuration } from '@/lib/alerts';
@@ -68,77 +67,70 @@ export function AlertRuleForm({
     }
   };
 
-  const field = {
-    color: t.text,
-    backgroundColor: t.surface,
-    borderColor: t.border,
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    fontSize: 14,
-  } as const;
-  const label = { color: t.textDim, fontSize: 12 } as const;
+  const field: CSSProperties = {
+    color: t.text, backgroundColor: t.surface, borderColor: t.border, borderWidth: 1, borderStyle: 'solid',
+    borderRadius: 8, padding: '8px 10px', fontSize: 14,
+  };
+  const label: CSSProperties = { color: t.textDim, fontSize: 12 };
   const toggle = (id: string) => setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
 
   return (
-    <View style={{ gap: 10, padding: 12, backgroundColor: t.surfaceAlt, borderRadius: 10, borderWidth: 1, borderColor: t.border }}>
-      <TextInput accessibilityLabel="Rule name" placeholder="Rule name" placeholderTextColor={t.textDim} value={name} onChangeText={setName} style={field} />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: 12, backgroundColor: t.surfaceAlt, borderRadius: 10, borderWidth: 1, borderStyle: 'solid', borderColor: t.border }}>
+      <input aria-label="Rule name" placeholder="Rule name" value={name} onChange={(e) => setName(e.target.value)} style={{ ...field, width: '100%' }} />
       <QueryInput value={query} onChange={setQuery} onSubmit={() => void save()} />
       {!query && (
-        <Text style={[mono, { color: t.textDim, fontSize: 11 }]} accessibilityLabel="Example query">
+        <span style={{ ...mono, color: t.textDim, fontSize: 11 }} aria-label="Example query">
           e.g. {EXAMPLE}
-        </Text>
+        </span>
       )}
-      <Text style={label}>Fire when the query value is</Text>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+      <span style={label}>Fire when the query value is</span>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
         {COMPARATORS.map((c) => (
           <Chip key={c.id} label={c.symbol} accessibilityLabel={`Comparator ${c.id}`} selected={comparator === c.id} onPress={() => setComparator(c.id)} />
         ))}
-        <TextInput
-          accessibilityLabel="Threshold"
+        <input
+          aria-label="Threshold"
           placeholder="Threshold"
-          placeholderTextColor={t.textDim}
           value={threshold}
-          onChangeText={setThreshold}
-          keyboardType="numbers-and-punctuation"
-          style={[field, { minWidth: 100 }]}
+          onChange={(e) => setThreshold(e.target.value)}
+          inputMode="decimal"
+          style={{ ...field, minWidth: 100 }}
         />
-      </View>
-      <View style={{ flexDirection: 'row', gap: 8 }}>
+      </div>
+      <div style={{ display: 'flex', gap: 8 }}>
         {[
           { l: 'Window', v: windowText, set: setWindowText },
           { l: 'For', v: forText, set: setForText },
           { l: 'Cooldown', v: cooldown, set: setCooldown },
         ].map((f) => (
-          <View key={f.l} style={{ flex: 1, gap: 4 }}>
-            <Text style={label}>{f.l}</Text>
-            <TextInput accessibilityLabel={f.l} value={f.v} onChangeText={f.set} autoCapitalize="none" placeholderTextColor={t.textDim} style={field} />
-          </View>
+          <div key={f.l} style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={label}>{f.l}</span>
+            <input aria-label={f.l} value={f.v} onChange={(e) => f.set(e.target.value)} autoCapitalize="none" style={{ ...field, width: '100%' }} />
+          </div>
         ))}
-      </View>
-      <Text style={label}>Severity</Text>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+      </div>
+      <span style={label}>Severity</span>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
         {SEVERITIES.map((s) => (
           <Chip key={s} label={s} accessibilityLabel={`Severity ${s}`} selected={severity === s} onPress={() => setSeverity(s)} />
         ))}
-      </View>
-      <Text style={label}>Notify</Text>
+      </div>
+      <span style={label}>Notify</span>
       {channels.length === 0 ? (
-        <Text style={{ color: t.textDim, fontSize: 12 }}>No channels yet. An admin can add one in Settings.</Text>
+        <span style={{ color: t.textDim, fontSize: 12 }}>No channels yet. An admin can add one in Settings.</span>
       ) : (
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
           {channels.map((c) => (
             <Chip key={c.id} label={c.name} accessibilityLabel={`Channel ${c.name}`} selected={picked.includes(c.id)} onPress={() => toggle(c.id)} />
           ))}
-        </View>
+        </div>
       )}
       <Chip label={enabled ? 'Enabled' : 'Disabled'} accessibilityLabel="Enabled" selected={enabled} onPress={() => setEnabled((e) => !e)} />
       {error && <ErrorText>{error}</ErrorText>}
-      <View style={{ flexDirection: 'row', gap: 8 }}>
+      <div style={{ display: 'flex', gap: 8 }}>
         <Button title={submitLabel} onPress={() => void save()} loading={busy} style={{ flex: 1 }} />
         <Button title="Cancel" variant="ghost" onPress={onCancel} />
-      </View>
-    </View>
+      </div>
+    </div>
   );
 }

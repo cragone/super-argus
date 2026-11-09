@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import { Text, TextInput, View } from 'react-native';
+import { useState, type CSSProperties } from 'react';
 
 import { errorMessage, type Channel, type ChannelInput } from '@/api/client';
 import { useAlertMutations, useChannels } from '@/hooks/useAlerts';
@@ -94,31 +93,34 @@ export function ChannelsCard() {
       onError: (e) => setResults((m) => ({ ...m, [id]: errorMessage(e, 'Test failed') })),
     });
 
-  const field = { color: t.text, backgroundColor: t.surface, borderColor: t.border, borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, fontSize: 14 } as const;
+  const field: CSSProperties = {
+    color: t.text, backgroundColor: t.surface, borderColor: t.border, borderWidth: 1, borderStyle: 'solid',
+    borderRadius: 8, padding: '8px 10px', fontSize: 14, width: '100%',
+  };
   return (
-    <Card style={{ gap: 10 }}>
-      <Text style={{ color: t.text, fontSize: 16, fontWeight: '700' }}>Notification channels</Text>
-      {channels.data?.length === 0 && <Text style={{ color: t.textDim }}>No channels yet.</Text>}
+    <Card style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <span style={{ color: t.text, fontSize: 16, fontWeight: 700 }}>Notification channels</span>
+      {channels.data?.length === 0 && <span style={{ color: t.textDim }}>No channels yet.</span>}
       {channels.data?.map((c) => (
-        <View key={c.id} style={{ gap: 4 }}>
-          <Text style={{ color: t.text, fontWeight: '600' }}>{c.name}</Text>
-          <Text style={{ color: t.textDim, fontSize: 12 }}>
+        <div key={c.id} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <span style={{ color: t.text, fontWeight: 600 }}>{c.name}</span>
+          <span style={{ color: t.textDim, fontSize: 12 }}>
             {summarize(c)}
             {c.has_secret ? ' · signed' : ''}
-          </Text>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
+          </span>
+          <div style={{ display: 'flex', gap: 8 }}>
             <Chip label="Send test" accessibilityLabel={`Test ${c.name}`} onPress={() => test(c.id)} />
             <Chip
               label="Delete"
               accessibilityLabel={`Delete channel ${c.name}`}
               onPress={() => deleteChannel.mutate(c.id, { onError: (e) => setError(errorMessage(e, 'Could not delete the channel')) })}
             />
-          </View>
-          {results[c.id] && <Text style={{ color: t.textDim, fontSize: 12 }}>{results[c.id]}</Text>}
-        </View>
+          </div>
+          {results[c.id] && <span style={{ color: t.textDim, fontSize: 12 }}>{results[c.id]}</span>}
+        </div>
       ))}
 
-      <View style={{ flexDirection: 'row', gap: 6 }}>
+      <div style={{ display: 'flex', gap: 6 }}>
         {CHANNEL_TYPES.map((ct) => (
           <Chip
             key={ct.id}
@@ -128,39 +130,38 @@ export function ChannelsCard() {
             onPress={() => setType(ct.id)}
           />
         ))}
-      </View>
-      <TextInput accessibilityLabel="Channel name" placeholder="Name" placeholderTextColor={t.textDim} value={name} onChangeText={setName} style={field} />
+      </div>
+      <input aria-label="Channel name" placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} style={field} />
 
       {type === 'webhook' && (
-        <TextInput accessibilityLabel="Webhook URL" placeholder="https://example.com/hook" placeholderTextColor={t.textDim} value={url} onChangeText={setUrl} autoCapitalize="none" autoCorrect={false} style={field} />
+        <input aria-label="Webhook URL" placeholder="https://example.com/hook" value={url} onChange={(e) => setUrl(e.target.value)} autoCapitalize="none" autoCorrect="off" style={field} />
       )}
 
       {type === 'email' && (
         <>
-          <TextInput accessibilityLabel="SMTP host" placeholder="smtp.example.com" placeholderTextColor={t.textDim} value={smtpHost} onChangeText={setSmtpHost} autoCapitalize="none" autoCorrect={false} style={field} />
-          <TextInput accessibilityLabel="SMTP port" placeholder="587" placeholderTextColor={t.textDim} value={smtpPort} onChangeText={setSmtpPort} keyboardType="number-pad" style={field} />
-          <TextInput accessibilityLabel="SMTP username" placeholder="Username (optional)" placeholderTextColor={t.textDim} value={username} onChangeText={setUsername} autoCapitalize="none" autoCorrect={false} style={field} />
-          <TextInput accessibilityLabel="From address" placeholder="alerts@example.com" placeholderTextColor={t.textDim} value={from} onChangeText={setFrom} autoCapitalize="none" autoCorrect={false} style={field} />
-          <TextInput accessibilityLabel="Recipients" placeholder="oncall@example.com, lead@example.com" placeholderTextColor={t.textDim} value={to} onChangeText={setTo} autoCapitalize="none" autoCorrect={false} style={field} />
+          <input aria-label="SMTP host" placeholder="smtp.example.com" value={smtpHost} onChange={(e) => setSmtpHost(e.target.value)} autoCapitalize="none" autoCorrect="off" style={field} />
+          <input aria-label="SMTP port" placeholder="587" value={smtpPort} onChange={(e) => setSmtpPort(e.target.value)} inputMode="numeric" style={field} />
+          <input aria-label="SMTP username" placeholder="Username (optional)" value={username} onChange={(e) => setUsername(e.target.value)} autoCapitalize="none" autoCorrect="off" style={field} />
+          <input aria-label="From address" placeholder="alerts@example.com" value={from} onChange={(e) => setFrom(e.target.value)} autoCapitalize="none" autoCorrect="off" style={field} />
+          <input aria-label="Recipients" placeholder="oncall@example.com, lead@example.com" value={to} onChange={(e) => setTo(e.target.value)} autoCapitalize="none" autoCorrect="off" style={field} />
         </>
       )}
 
       {type === 'sms' && (
         <>
-          <TextInput accessibilityLabel="Twilio account SID" placeholder="ACxxxxxxxxxxxxxxxx" placeholderTextColor={t.textDim} value={accountSid} onChangeText={setAccountSid} autoCapitalize="none" autoCorrect={false} style={field} />
-          <TextInput accessibilityLabel="From number" placeholder="+15550000000" placeholderTextColor={t.textDim} value={from} onChangeText={setFrom} autoCapitalize="none" autoCorrect={false} style={field} />
-          <TextInput accessibilityLabel="Recipients" placeholder="+15551111111, +15552222222" placeholderTextColor={t.textDim} value={to} onChangeText={setTo} autoCapitalize="none" autoCorrect={false} style={field} />
+          <input aria-label="Twilio account SID" placeholder="ACxxxxxxxxxxxxxxxx" value={accountSid} onChange={(e) => setAccountSid(e.target.value)} autoCapitalize="none" autoCorrect="off" style={field} />
+          <input aria-label="From number" placeholder="+15550000000" value={from} onChange={(e) => setFrom(e.target.value)} autoCapitalize="none" autoCorrect="off" style={field} />
+          <input aria-label="Recipients" placeholder="+15551111111, +15552222222" value={to} onChange={(e) => setTo(e.target.value)} autoCapitalize="none" autoCorrect="off" style={field} />
         </>
       )}
 
-      <TextInput
-        accessibilityLabel="Secret"
+      <input
+        aria-label="Secret"
         placeholder={type === 'webhook' ? 'Signing secret (optional)' : type === 'email' ? 'SMTP password (optional)' : 'Auth token (optional)'}
-        placeholderTextColor={t.textDim}
         value={secret}
-        onChangeText={setSecret}
+        onChange={(e) => setSecret(e.target.value)}
         autoCapitalize="none"
-        secureTextEntry
+        type="password"
         style={field}
       />
       {error && <ErrorText>{error}</ErrorText>}

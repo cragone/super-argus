@@ -1,11 +1,10 @@
-import { FlashList } from '@shopify/flash-list';
 import { useCallback, useMemo, useState } from 'react';
-import { Text, View } from 'react-native';
 
 import { errorMessage } from '@/api/client';
 import { LogRow } from '@/components/LogRow';
 import { TimeRangePicker } from '@/components/TimeRangePicker';
 import { Button, ErrorText } from '@/components/ui';
+import { VirtualList } from '@/components/VirtualList';
 import { useRangeQuery, type SubmittedQuery } from '@/hooks/useLogs';
 import { resolveRange, type TimeRange } from '@/lib/time';
 import { useTheme } from '@/theme';
@@ -49,46 +48,45 @@ export function ServiceHistory({ query }: { query: string }) {
   const stats = result.data?.stats;
 
   return (
-    <View style={{ flex: 1 }}>
-      <View style={{ padding: 12, gap: 8, borderBottomWidth: 1, borderBottomColor: t.border }}>
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+      <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 8, borderBottom: `1px solid ${t.border}` }}>
         <TimeRangePicker value={range} onChange={setRange} />
-        <View style={{ flexDirection: 'row', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8 }}>
           <Button title="Run" onPress={run} loading={result.isFetching} style={{ flex: 1 }} />
           <Button
             title={direction === 'backward' ? 'Newest first' : 'Oldest first'}
             variant="ghost"
             onPress={() => setDirection((d) => (d === 'backward' ? 'forward' : 'backward'))}
           />
-        </View>
+        </div>
         {formError && <ErrorText>{formError}</ErrorText>}
-      </View>
+      </div>
       {result.isError && (
-        <View style={{ padding: 12 }}>
+        <div style={{ padding: 12 }}>
           <ErrorText>{errorMessage(result.error)}</ErrorText>
-        </View>
+        </div>
       )}
       {stats && (
-        <Text accessibilityLabel="Query stats" style={{ color: t.textDim, fontSize: 12, paddingHorizontal: 12, paddingVertical: 6 }}>
+        <span aria-label="Query stats" style={{ color: t.textDim, fontSize: 12, padding: '6px 12px' }}>
           {rows.length} {rows.length === 1 ? 'line' : 'lines'}
           {rows.length >= LIMIT ? ` (limit ${LIMIT})` : ''} · {stats.elapsed_ms} ms
-        </Text>
+        </span>
       )}
-      <View style={{ flex: 1 }}>
+      <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
         {result.isFetching && !result.data ? (
-          <Text style={{ color: t.textDim, padding: 16 }}>Running…</Text>
+          <span style={{ color: t.textDim, padding: 16 }}>Running…</span>
         ) : rows.length === 0 && !result.isError ? (
-          <Text style={{ color: t.textDim, padding: 16 }}>No lines from this service in this time range.</Text>
+          <span style={{ color: t.textDim, padding: 16 }}>No lines from this service in this time range.</span>
         ) : (
-          <FlashList
+          <VirtualList
             data={rows}
-            extraData={expanded}
             keyExtractor={(r) => r.key}
-            renderItem={({ item }) => (
+            renderItem={(item) => (
               <LogRow rowKey={item.key} entry={item.entry} labels={result.data?.streams[item.entry.stream]} expanded={expanded.has(item.key)} onToggle={toggle} />
             )}
           />
         )}
-      </View>
-    </View>
+      </div>
+    </div>
   );
 }

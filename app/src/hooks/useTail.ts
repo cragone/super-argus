@@ -1,4 +1,3 @@
-import { fetch as streamingFetch } from 'expo/fetch';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { apiUrl } from '@/api/client';
@@ -76,7 +75,7 @@ export function useTail() {
           url: () => apiUrl(`/tail?query=${encodeURIComponent(query)}`),
           getToken: () => useSession.getState().accessToken,
           refresh: refreshAccessToken,
-          fetch: (url, init) => streamingFetch(url, init as never) as unknown as Promise<TailResponse>,
+          fetch: (url, init) => fetch(url, init) as unknown as Promise<TailResponse>,
           sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
         },
         {

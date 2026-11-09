@@ -1,5 +1,4 @@
 import { memo } from 'react';
-import { Pressable, Text, View } from 'react-native';
 
 import type { QueryEntry } from '@/api/client';
 import { detectLevel, prettyJson } from '@/lib/logLevel';
@@ -22,35 +21,56 @@ export const LogRow = memo(function LogRow({ entry, labels, expanded, onToggle, 
   const json = expanded ? prettyJson(entry.line) : null;
 
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`Log line at ${formatTime(entry.ts)}`}
-      accessibilityState={{ expanded }}
-      onPress={() => onToggle(rowKey)}
-      style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: t.border, backgroundColor: t.surface }}>
-      <View style={{ width: 4, backgroundColor: color }} />
-      <View style={{ flex: 1, paddingVertical: 6, paddingHorizontal: 10 }}>
-        <Text style={[mono, { fontSize: 11, color: t.textDim }]}>{expanded ? formatDateTime(entry.ts) : formatTime(entry.ts)}</Text>
-        <Text selectable={expanded} numberOfLines={expanded ? undefined : 2} style={[mono, { fontSize: 12.5, color: t.text }]}>
+    <button
+      type="button"
+      aria-label={`Log line at ${formatTime(entry.ts)}`}
+      aria-expanded={expanded}
+      onClick={() => onToggle(rowKey)}
+      style={{
+        display: 'flex',
+        width: '100%',
+        textAlign: 'left',
+        borderWidth: 0,
+        borderBottom: `1px solid ${t.border}`,
+        backgroundColor: t.surface,
+        cursor: 'pointer',
+        padding: 0,
+      }}>
+      <span style={{ width: 4, alignSelf: 'stretch', backgroundColor: color, flexShrink: 0 }} />
+      <span style={{ flex: 1, padding: '6px 10px', display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+        <span style={{ ...mono, fontSize: 11, color: t.textDim }}>{expanded ? formatDateTime(entry.ts) : formatTime(entry.ts)}</span>
+        <span
+          style={{
+            ...mono,
+            fontSize: 12.5,
+            color: t.text,
+            userSelect: expanded ? 'text' : 'none',
+            whiteSpace: expanded ? 'pre-wrap' : 'nowrap',
+            overflow: expanded ? 'visible' : 'hidden',
+            textOverflow: expanded ? 'clip' : 'ellipsis',
+            display: expanded ? 'block' : '-webkit-box',
+            WebkitLineClamp: expanded ? undefined : 2,
+            WebkitBoxOrient: expanded ? undefined : 'vertical',
+          }}>
           {json ?? entry.line}
-        </Text>
+        </span>
         {expanded && labels && (
-          <Text style={[mono, { fontSize: 11, color: t.textDim, marginTop: 6 }]}>
+          <span style={{ ...mono, fontSize: 11, color: t.textDim, marginTop: 6 }}>
             {Object.entries(labels)
               .map(([k, v]) => `${k}="${v}"`)
               .join('  ')}
-          </Text>
+          </span>
         )}
         {expanded && entry.fields && Object.keys(entry.fields).length > 0 && (
-          <View style={{ marginTop: 6 }}>
+          <span style={{ marginTop: 6, display: 'flex', flexDirection: 'column' }}>
             {Object.entries(entry.fields).map(([k, v]) => (
-              <Text key={k} style={[mono, { fontSize: 11, color: t.textDim }]}>
-                <Text style={{ color: t.accent }}>{k}</Text>={v}
-              </Text>
+              <span key={k} style={{ ...mono, fontSize: 11, color: t.textDim }}>
+                <span style={{ color: t.accent }}>{k}</span>={v}
+              </span>
             ))}
-          </View>
+          </span>
         )}
-      </View>
-    </Pressable>
+      </span>
+    </button>
   );
 });

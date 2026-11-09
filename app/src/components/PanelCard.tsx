@@ -1,5 +1,4 @@
 import { useMemo, useRef, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
 
 import { errorMessage, type Panel } from '@/api/client';
 import { usePanelData } from '@/hooks/useDashboards';
@@ -46,20 +45,16 @@ export function PanelCard({ panel, range, refreshMs }: { panel: Panel; range: Ti
   const refetching = q.isFetching && !!q.data; // keep the frame, dim it
   let body: React.ReactNode;
   if (q.isError) {
-    body = (
-      <Text accessibilityRole="alert" style={{ color: '#d03b3b', fontSize: 13 }}>
-        {errorMessage(q.error)}
-      </Text>
-    );
+    body = <span role="alert" style={{ color: '#d03b3b', fontSize: 13 }}>{errorMessage(q.error)}</span>;
   } else if (!q.data) {
-    body = <Text style={{ color: c.inkSecondary, fontSize: 13 }}>Loading…</Text>;
+    body = <span style={{ color: c.inkSecondary, fontSize: 13 }}>Loading…</span>;
   } else if (q.data.kind === 'logs') {
     const { entries, streams } = q.data.logs;
     body =
       entries.length === 0 ? (
-        <Text style={{ color: c.inkSecondary, fontSize: 13 }}>No lines in this range.</Text>
+        <span style={{ color: c.inkSecondary, fontSize: 13 }}>No lines in this range.</span>
       ) : (
-        <View style={{ maxHeight: height + 60, overflow: 'hidden' }}>
+        <div style={{ maxHeight: height + 60, overflow: 'hidden' }}>
           {entries.slice(0, 50).map((e, i) => {
             const key = `${e.ts}-${i}`;
             return (
@@ -73,15 +68,15 @@ export function PanelCard({ panel, range, refreshMs }: { panel: Panel; range: Ti
               />
             );
           })}
-        </View>
+        </div>
       );
   } else if (series.length === 0) {
-    body = <Text style={{ color: c.inkSecondary, fontSize: 13 }}>No data in this range.</Text>;
+    body = <span style={{ color: c.inkSecondary, fontSize: 13 }}>No data in this range.</span>;
   } else if (panel.type === 'stat') {
     body = <StatTile series={series} />;
   } else if (panel.type === 'top_n') {
     const items = barItems(series);
-    body = items.length === 0 ? <Text style={{ color: c.inkSecondary, fontSize: 13 }}>No data in this range.</Text> : <BarList items={items} />;
+    body = items.length === 0 ? <span style={{ color: c.inkSecondary, fontSize: 13 }}>No data in this range.</span> : <BarList items={items} />;
   } else if (table) {
     body = <ChartTable series={series} />;
   } else if (metric) {
@@ -94,20 +89,27 @@ export function PanelCard({ panel, range, refreshMs }: { panel: Panel; range: Ti
   }
 
   return (
-    <View
-      accessibilityLabel={`Panel ${panel.title}`}
-      style={{ backgroundColor: c.surface, borderColor: c.border, borderWidth: 1, borderRadius: 10, padding: 12, gap: 8, opacity: refetching ? 0.6 : 1 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-        <Text numberOfLines={1} accessibilityRole="header" style={{ color: c.ink, fontSize: 14, fontWeight: '600', flex: 1 }}>
+    <div
+      aria-label={`Panel ${panel.title}`}
+      style={{ backgroundColor: c.surface, borderColor: c.border, borderWidth: 1, borderStyle: 'solid', borderRadius: 10, padding: 12, display: 'flex', flexDirection: 'column', gap: 8, opacity: refetching ? 0.6 : 1 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+        <span
+          role="heading"
+          aria-level={3}
+          style={{ color: c.ink, fontSize: 14, fontWeight: 600, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {panel.title}
-        </Text>
+        </span>
         {chartPanel && q.data?.kind === 'metric' && series.length > 0 && (
-          <Pressable accessibilityRole="button" accessibilityLabel={table ? 'Show chart' : 'Show table'} onPress={() => setTable((t) => !t)}>
-            <Text style={{ color: c.inkSecondary, fontSize: 12 }}>{table ? 'Chart' : 'Table'}</Text>
-          </Pressable>
+          <button
+            type="button"
+            aria-label={table ? 'Show chart' : 'Show table'}
+            onClick={() => setTable((t) => !t)}
+            style={{ background: 'none', border: 0, padding: 0, cursor: 'pointer', color: c.inkSecondary, fontSize: 12 }}>
+            {table ? 'Chart' : 'Table'}
+          </button>
         )}
-      </View>
+      </div>
       {body}
-    </View>
+    </div>
   );
 }

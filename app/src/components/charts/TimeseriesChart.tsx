@@ -1,6 +1,4 @@
 import { useMemo, useState } from 'react';
-import { Platform, Text, View, type LayoutChangeEvent } from 'react-native';
-import Svg, { Circle, Line, Path, Text as SvgText } from 'react-native-svg';
 
 import {
   formatFullTime,
@@ -14,13 +12,14 @@ import {
   valueAt,
   type ChartSeries,
 } from '@/lib/chart';
+import { useElementWidth } from '@/hooks/useElementWidth';
 import { useChartColors } from '@/theme/chartColors';
 
 import { HoverSurface } from './HoverSurface';
 
 const M = { left: 44, right: 14, top: 10, bottom: 22 };
-// SVG text does not inherit the app font on web; use the system sans (native keeps its default).
-const FONT = Platform.select({ web: 'system-ui, -apple-system, "Segoe UI", sans-serif', default: undefined });
+// SVG text does not inherit the page font; use the system sans explicitly.
+const FONT = 'system-ui, -apple-system, "Segoe UI", sans-serif';
 
 export interface TimeseriesChartProps {
   series: ChartSeries[];
@@ -64,7 +63,7 @@ export function linePaths(
  */
 export function TimeseriesChart({ series, slots, startMs, endMs, stepMs, height = 200, format = formatValue }: TimeseriesChartProps) {
   const c = useChartColors();
-  const [width, setWidth] = useState(0);
+  const [ref, width] = useElementWidth<HTMLDivElement>();
   const [hoverX, setHoverX] = useState<number | null>(null);
 
   const plotW = Math.max(0, width - M.left - M.right);
@@ -78,7 +77,6 @@ export function TimeseriesChart({ series, slots, startMs, endMs, stepMs, height 
   const hoverIdx = hoverX === null || times.length === 0 ? -1 : nearestIndex(times.map(x), hoverX + 0);
   const hoverT = hoverIdx >= 0 ? times[hoverIdx] : null;
 
-  const onLayout = (e: LayoutChangeEvent) => setWidth(Math.floor(e.nativeEvent.layout.width));
   const single = series.length === 1;
 
   const rows =
@@ -93,20 +91,24 @@ export function TimeseriesChart({ series, slots, startMs, endMs, stepMs, height 
   const tipRight = hoverT !== null && x(hoverT) < M.left + plotW / 2;
 
   return (
-    <View onLayout={onLayout} style={{ width: '100%', height }} accessible accessibilityLabel={`Line chart with ${series.length} series`}>
+    <div
+      ref={ref}
+      style={{ position: 'relative', width: '100%', height }}
+      role="img"
+      aria-label={`Line chart with ${series.length} series`}>
       {width > 0 && (
         <>
-          <Svg width={width} height={height}>
+          <svg width={width} height={height}>
             {axis.ticks.map((tv) => (
-              <Line key={`g${tv}`} x1={M.left} x2={M.left + plotW} y1={y(tv)} y2={y(tv)} stroke={tv === 0 ? c.baseline : c.grid} strokeWidth={1} />
+              <line key={`g${tv}`} x1={M.left} x2={M.left + plotW} y1={y(tv)} y2={y(tv)} stroke={tv === 0 ? c.baseline : c.grid} strokeWidth={1} />
             ))}
             {axis.ticks.map((tv) => (
-              <SvgText key={`l${tv}`} fontFamily={FONT} x={M.left - 6} y={y(tv) + 4} fontSize={11} fill={c.inkMuted} textAnchor="end">
+              <text key={`l${tv}`} fontFamily={FONT} x={M.left - 6} y={y(tv) + 4} fontSize={11} fill={c.inkMuted} textAnchor="end">
                 {format(tv)}
-              </SvgText>
+              </text>
             ))}
             {timeTicks(startMs, endMs, plotW > 420 ? 5 : 3).map((t, i, arr) => (
-              <SvgText
+              <text
                 fontFamily={FONT}
                 key={`x${t}`}
                 x={x(t)}
@@ -115,11 +117,11 @@ export function TimeseriesChart({ series, slots, startMs, endMs, stepMs, height 
                 fill={c.inkMuted}
                 textAnchor={i === 0 ? 'start' : i === arr.length - 1 ? 'end' : 'middle'}>
                 {formatTick(t, endMs - startMs)}
-              </SvgText>
+              </text>
             ))}
 
             {single && series[0].points.length > 1 && (
-              <Path
+              <path
                 d={`${linePaths(series[0].points, x, y, stepMs).join(' ')} L ${x(series[0].points[series[0].points.length - 1][0]).toFixed(1)} ${y(0)} L ${x(series[0].points[0][0]).toFixed(1)} ${y(0)} Z`}
                 fill={c.categorical[slots[0] % 8]}
                 fillOpacity={0.1}
@@ -127,57 +129,59 @@ export function TimeseriesChart({ series, slots, startMs, endMs, stepMs, height 
             )}
             {series.map((s, i) =>
               linePaths(s.points, x, y, stepMs).map((d, k) => (
-                <Path key={`${s.key}-${k}`} d={d} stroke={c.categorical[slots[i] % 8]} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" fill="none" />
+                <path key={`${s.key}-${k}`} d={d} stroke={c.categorical[slots[i] % 8]} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" fill="none" />
               )),
             )}
             {series.map((s, i) => {
               const last = s.points[s.points.length - 1];
               if (!last) return null;
-              return <Circle key={`e${s.key}`} cx={x(last[0])} cy={y(last[1])} r={4} fill={c.categorical[slots[i] % 8]} stroke={c.surface} strokeWidth={2} />;
+              return <circle key={`e${s.key}`} cx={x(last[0])} cy={y(last[1])} r={4} fill={c.categorical[slots[i] % 8]} stroke={c.surface} strokeWidth={2} />;
             })}
 
             {hoverT !== null && (
               <>
-                <Line x1={x(hoverT)} x2={x(hoverT)} y1={M.top} y2={M.top + plotH} stroke={c.inkMuted} strokeWidth={1} />
+                <line x1={x(hoverT)} x2={x(hoverT)} y1={M.top} y2={M.top + plotH} stroke={c.inkMuted} strokeWidth={1} />
                 {rows.map((r) => (
-                  <Circle key={`h${r.s.key}`} cx={x(hoverT)} cy={y(r.v as number)} r={4} fill={c.categorical[slots[r.i] % 8]} stroke={c.surface} strokeWidth={2} />
+                  <circle key={`h${r.s.key}`} cx={x(hoverT)} cy={y(r.v as number)} r={4} fill={c.categorical[slots[r.i] % 8]} stroke={c.surface} strokeWidth={2} />
                 ))}
               </>
             )}
-          </Svg>
+          </svg>
 
           <HoverSurface width={width} height={plotH + M.top} onMove={setHoverX} />
 
           {hoverT !== null && rows.length > 0 && (
-            <View
-              pointerEvents="none"
+            <div
               style={{
                 position: 'absolute',
+                pointerEvents: 'none',
                 top: M.top,
                 ...(tipRight ? { left: x(hoverT) + 12 } : { right: width - x(hoverT) + 12 }),
                 backgroundColor: c.surface,
                 borderColor: c.border,
                 borderWidth: 1,
+                borderStyle: 'solid',
                 borderRadius: 8,
-                paddingVertical: 6,
-                paddingHorizontal: 10,
+                padding: '6px 10px',
+                display: 'flex',
+                flexDirection: 'column',
                 gap: 3,
                 maxWidth: 260,
               }}>
-              <Text style={{ color: c.inkSecondary, fontSize: 11 }}>{formatFullTime(hoverT)}</Text>
+              <span style={{ color: c.inkSecondary, fontSize: 11 }}>{formatFullTime(hoverT)}</span>
               {rows.map((r) => (
-                <View key={r.s.key} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <View style={{ width: 10, height: 2, backgroundColor: c.categorical[slots[r.i] % 8] }} />
-                  <Text style={{ color: c.ink, fontSize: 12, fontWeight: '700' }}>{format(r.v as number)}</Text>
-                  <Text numberOfLines={1} style={{ color: c.inkSecondary, fontSize: 11, flexShrink: 1 }}>
+                <div key={r.s.key} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ width: 10, height: 2, backgroundColor: c.categorical[slots[r.i] % 8] }} />
+                  <span style={{ color: c.ink, fontSize: 12, fontWeight: 700 }}>{format(r.v as number)}</span>
+                  <span style={{ color: c.inkSecondary, fontSize: 11, flexShrink: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {r.s.label}
-                  </Text>
-                </View>
+                  </span>
+                </div>
               ))}
-            </View>
+            </div>
           )}
         </>
       )}
-    </View>
+    </div>
   );
 }

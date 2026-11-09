@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ReactElement } from 'react';
+import { vi } from 'vitest';
 
 import type { AlertRule, Channel } from '@/api/client';
 import { AlertRuleForm } from '@/components/AlertRuleForm';
@@ -49,12 +50,12 @@ describe('AlertRuleForm', () => {
   };
 
   it('submits the edited rule', async () => {
-    const onSubmit = jest.fn().mockResolvedValue(undefined);
-    await render(withClient(<AlertRuleForm initial={initial} channels={channels} submitLabel="Save rule" onSubmit={onSubmit} onCancel={jest.fn()} />));
-    await fireEvent.changeText(screen.getByLabelText('Threshold'), '9.5');
-    await fireEvent.press(screen.getByLabelText('Comparator lte'));
-    await fireEvent.press(screen.getByLabelText('Channel ops')); // deselect
-    await fireEvent.press(screen.getByLabelText('Save rule'));
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    render(withClient(<AlertRuleForm initial={initial} channels={channels} submitLabel="Save rule" onSubmit={onSubmit} onCancel={vi.fn()} />));
+    fireEvent.change(screen.getByLabelText('Threshold'), { target: { value: '9.5' } });
+    fireEvent.click(screen.getByLabelText('Comparator lte'));
+    fireEvent.click(screen.getByLabelText('Channel ops')); // deselect
+    fireEvent.click(screen.getByLabelText('Save rule'));
     await waitFor(() => expect(onSubmit).toHaveBeenCalled());
     expect(onSubmit).toHaveBeenCalledWith({
       name: 'errors', query: 'rate({a="b"}[1m])', comparator: 'lte', threshold: 9.5, window: '5m', for_duration: '2m',
@@ -63,10 +64,10 @@ describe('AlertRuleForm', () => {
   });
 
   it('rejects bad input before calling the server', async () => {
-    const onSubmit = jest.fn();
-    await render(withClient(<AlertRuleForm initial={initial} channels={channels} submitLabel="Save rule" onSubmit={onSubmit} onCancel={jest.fn()} />));
-    await fireEvent.changeText(screen.getByLabelText('Window'), 'soon');
-    await fireEvent.press(screen.getByLabelText('Save rule'));
+    const onSubmit = vi.fn();
+    render(withClient(<AlertRuleForm initial={initial} channels={channels} submitLabel="Save rule" onSubmit={onSubmit} onCancel={vi.fn()} />));
+    fireEvent.change(screen.getByLabelText('Window'), { target: { value: 'soon' } });
+    fireEvent.click(screen.getByLabelText('Save rule'));
     expect(await screen.findByRole('alert')).toBeTruthy();
     expect(onSubmit).not.toHaveBeenCalled();
   });

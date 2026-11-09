@@ -1,4 +1,4 @@
-import { ScrollView, Text, TextInput, View } from 'react-native';
+import type { CSSProperties } from 'react';
 
 import { RANGE_PRESETS, type TimeRange } from '@/lib/time';
 import { mono, useTheme } from '@/theme';
@@ -7,22 +7,22 @@ import { Chip } from './ui';
 
 export function TimeRangePicker({ value, onChange }: { value: TimeRange; onChange: (r: TimeRange) => void }) {
   const t = useTheme();
-  const input = {
+  const input: CSSProperties = {
     flex: 1,
     color: t.text,
     backgroundColor: t.surface,
     borderColor: t.border,
     borderWidth: 1,
+    borderStyle: 'solid',
     borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
+    padding: '6px 8px',
     fontSize: 13,
     ...mono,
-  } as const;
+  };
 
   return (
-    <View style={{ gap: 8 }}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ display: 'flex', overflowX: 'auto' }}>
         {RANGE_PRESETS.map((p) => (
           <Chip
             key={p.id}
@@ -40,29 +40,29 @@ export function TimeRangePicker({ value, onChange }: { value: TimeRange; onChang
             onChange({ kind: 'custom', start: new Date(end.getTime() - 3_600_000).toISOString(), end: end.toISOString() });
           }}
         />
-      </ScrollView>
+      </div>
       {value.kind === 'custom' && (
-        <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
-          <Text style={{ color: t.textDim }}>From</Text>
-          <TextInput
-            accessibilityLabel="Start time"
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <span style={{ color: t.textDim }}>From</span>
+          <input
+            aria-label="Start time"
             value={value.start}
-            onChangeText={(start) => onChange({ ...value, start })}
+            onChange={(e) => onChange({ ...value, start: e.target.value })}
             autoCapitalize="none"
-            autoCorrect={false}
+            autoCorrect="off"
             style={input}
           />
-          <Text style={{ color: t.textDim }}>to</Text>
-          <TextInput
-            accessibilityLabel="End time"
+          <span style={{ color: t.textDim }}>to</span>
+          <input
+            aria-label="End time"
             value={value.end}
-            onChangeText={(end) => onChange({ ...value, end })}
+            onChange={(e) => onChange({ ...value, end: e.target.value })}
             autoCapitalize="none"
-            autoCorrect={false}
+            autoCorrect="off"
             style={input}
           />
-        </View>
+        </div>
       )}
-    </View>
+    </div>
   );
 }

@@ -34,3 +34,32 @@ func TestTLSSettingsMustBePaired(t *testing.T) {
 		t.Fatalf("paired TLS settings should load: %+v %v", c, err)
 	}
 }
+
+func TestChunkStoreDefaultsToLocal(t *testing.T) {
+	t.Setenv("ARGUS_JWT_SECRET", "s")
+	c, err := Load()
+	if err != nil || c.ChunkStore != "local" {
+		t.Fatalf("expected local by default: %+v %v", c, err)
+	}
+}
+
+func TestChunkStoreS3RequiresBucket(t *testing.T) {
+	t.Setenv("ARGUS_JWT_SECRET", "s")
+	t.Setenv("ARGUS_CHUNK_STORE", "s3")
+	if _, err := Load(); err == nil {
+		t.Fatal("expected error without ARGUS_S3_BUCKET")
+	}
+	t.Setenv("ARGUS_S3_BUCKET", "my-bucket")
+	c, err := Load()
+	if err != nil || c.S3Bucket != "my-bucket" {
+		t.Fatalf("s3 config with bucket should load: %+v %v", c, err)
+	}
+}
+
+func TestChunkStoreRejectsUnknownValue(t *testing.T) {
+	t.Setenv("ARGUS_JWT_SECRET", "s")
+	t.Setenv("ARGUS_CHUNK_STORE", "memory")
+	if _, err := Load(); err == nil {
+		t.Fatal("expected error for unknown ARGUS_CHUNK_STORE")
+	}
+}

@@ -12,6 +12,26 @@ go run ./cmd/argus
 
 `.env` is picked up from the working directory or any parent. Real environment variables win over `.env`.
 
+### Postgres instead of SQLite
+
+Set `ARGUS_DB_DSN=postgres://user:pass@host:5432/dbname?sslmode=disable` to use Postgres for metadata and the chunk index instead of the default SQLite file. Migrations and GORM model behavior are validated in CI against Postgres 16 (see `.github/workflows/ci.yml`'s `postgres` job and `internal/db/db_test.go`'s `TestOpenAndMigrate_Postgres`); `docker-compose up -d postgres` gives the same thing locally. `argus backup` does not support Postgres — use `pg_dump` instead.
+
+## Local dev environment (Nix)
+
+`flake.nix` provides two dev shells and a one-command local environment:
+
+```
+nix develop                 # Go + Node 22 + process-compose, for running pieces by hand
+nix develop .#testapp       # Go only, for working on testapp in isolation
+nix run .#dev-env           # builds the web client, then runs everything via process-compose
+```
+
+`nix run .#dev-env` builds the Expo web client (`cd app && npm ci && npm run build:web`, skipped if `internal/webui/dist/index.html` already exists; force a rebuild with `ARGUS_REBUILD_CLIENT=1`), then starts `process-compose up --no-server`, which runs Argus (readiness-probed on `/healthz`), mints a testapp API key against the real auth/API-key endpoints (`scripts/dev/mint-key.sh`, writes `testapp/.env.generated`), starts testapp wired to that key, and leaves an optional traffic generator disabled by default (toggle it from the process-compose TUI).
+
+With [direnv](https://direnv.net/) installed, `.envrc` (and `testapp/.envrc`) run `use flake` automatically on `cd`.
+
+Not covered by this setup: the Expo native dev loop (`npx expo start`, for iOS/Android) is still run by hand from `app/`; database migrations aren't orchestrated separately, since `go run ./cmd/argus` applies them on boot.
+
 ## Ingest (Phase 2)
 
 `POST /api/v1/ingest/push` with header `X-Argus-Key: <api key>` (mint one via `POST /api/v1/api-keys` as admin).
@@ -27,6 +47,12 @@ Body is NDJSON, optionally gzip (`Content-Encoding: gzip`), max 5 MB:
 
 **Do not put user IDs, request IDs or session IDs in labels.** Every distinct label set is a stream, and each API key may hold at most `ARGUS_MAX_STREAMS_PER_KEY` (default 10,000) of them. Put high-cardinality values in the log line instead.
 
+### Restricting an API key's labels
+
+An API key's `allowed_labels` (set at creation, `POST /api-keys`) restricts the values it may write for the label keys it names: `{"service": "checkout"}` allows only `service=checkout`; `{"service": ["checkout", "billing"]}` allows either. A label key not named in `allowed_labels` passes through unrestricted — this only locks down the keys an operator chooses to name, not the whole label set — and an empty or absent `allowed_labels` (the default for every key today) is unrestricted, same as before this existed. A push using a disallowed value is rejected the same way a too-long value is.
+
+This restricts what a key can **write**, not what a logged-in user can **read**: there is no query-time tenant isolation yet, so any authenticated user can still query across every stream regardless of which key ingested it. Treat `allowed_labels` as a guard against a misconfigured shipper, not as multi-tenant data isolation.
+
 ### Limits
 15 labels per stream, 256 bytes per label value, 64 KB per line (longer lines are truncated with a `...[truncated]` marker), per-key rate limits `ARGUS_RATE_LINES_PER_SEC` (default 10,000; a key's own `rate_limit` overrides it) and `ARGUS_RATE_BYTES_PER_SEC` (default 10 MB), with bursts up to 5x.
 
@@ -39,6 +65,12 @@ data/chunks/yyyy/mm/dd/<stream_id>/<id>.chk     zstd-compressed chunk files
 Every accepted line is appended to the WAL before the request is acknowledged. The WAL is fsynced every `ARGUS_WAL_SYNC_MS` (default 200; `0` = fsync on every request). After a crash (`kill -9`, power loss) at most that window of acknowledged lines can be lost; the rest is replayed into chunk files on the next start. A crash right after chunks were written but before old WAL segments were dropped can duplicate lines on replay (at-least-once).
 
 Head chunks flush to disk at ~1 MB or ~1 h of age, and on graceful shutdown. Chunks older than `ARGUS_RETENTION_DAYS` (default 14) are deleted hourly, along with streams that have no chunks left.
+
+### Chunk storage backend
+
+Chunks are stored on local disk by default (`ARGUS_CHUNK_STORE=local`, the layout above). Set `ARGUS_CHUNK_STORE=s3` to store them in an S3-compatible bucket instead: `ARGUS_S3_BUCKET` (required), plus optional `ARGUS_S3_REGION`, `ARGUS_S3_ENDPOINT` (point this at MinIO or another S3-compatible service; it enables path-style addressing), and `ARGUS_S3_PREFIX`. Credentials come from the standard AWS chain (env vars, shared config/credentials files, or an IAM role) — there is no Argus-specific credential setting. The WAL and SQLite index always stay on local disk; only chunk files move.
+
+**Backup with `ARGUS_CHUNK_STORE=s3`:** `argus backup` only copies the WAL and the SQLite index in this mode — there is no local chunk tree to walk, and S3's own durability is the substitute for the chunk-copy step. The backup log line says so explicitly (`chunks_not_copied_reason` / a `WARN` instead of an `INFO` on completion).
 
 ### Load testing
 ```
@@ -159,12 +191,16 @@ An alert rule runs a **metric query** on a schedule and compares its latest valu
 - **Evaluation:** one ruler goroutine ticks every 15s. For each series it takes the newest point; a breaching series decides the value. No data reads as `0`, so "fewer than N lines" rules fire when logs stop. Evaluation errors (for example a limit) keep the current state and show in `last_error`.
 - **State machine:** `ok -> pending -> firing -> ok`. With `for_duration` of `0s` a breach fires immediately. A pending rule that recovers returns to `ok` silently. State is stored in `alert_states`, so a restart does not re-fire.
 - **Notifications:** sent on `firing` and on `resolved` (only if the firing was notified). A firing inside the `cooldown` window of the last notification is recorded but not sent, and its resolve is not sent either. Every transition (`pending`, `firing`, `resolved`) is stored in `alert_events` with the value and whether delivery succeeded.
-- **Webhooks:** JSON body `{status, rule_id, rule_name, severity, query, comparator, threshold, value, at}` where `status` is `firing`, `resolved` or `test`. Three attempts with 1s and 2s backoff on network errors, `5xx` and `429`; other `4xx` fail at once. If the channel has a secret, the body is signed: `X-Argus-Signature: sha256=<hex HMAC-SHA256>`.
-- **Channels** are admin-managed. Secrets are encrypted at rest (AES-GCM, key derived from `ARGUS_JWT_SECRET`, so **changing the JWT secret invalidates stored channel secrets**). The API never returns the URL or secret, only the host and `has_secret`.
+- **Channel types:** `webhook`, `email` (SMTP), and `sms` (Twilio's Messages REST API). All three implement the same `notify.Notifier` interface and are dispatched by a `notify.Router` keyed on the channel's `type`; a channel's `type` can't be changed into a different shape without redoing its config (a type change starts from a blank config rather than reinterpreting the old fields).
+  - **webhook:** `{url, secret}`. JSON body `{status, rule_id, rule_name, severity, query, comparator, threshold, value, at}` where `status` is `firing`, `resolved` or `test`. If the channel has a secret, the body is signed: `X-Argus-Signature: sha256=<hex HMAC-SHA256>`.
+  - **email:** `{smtp_host, smtp_port, username, secret (SMTP password), from, to}`, sent via `net/smtp` (STARTTLS is used automatically when the server advertises it; no separate flag). SMTP's retry convention is the inverse of HTTP's: a `4xx` reply (transient) is retried, a `5xx` reply (permanent) is not.
+  - **sms:** `{account_sid, secret (Twilio auth token), from, to}`, one Twilio API request per recipient in `to`.
+  - All three: three attempts with 1s and 2s backoff on retryable failures (network errors and `5xx`/`429` for webhook/sms; `4xx` for email, per SMTP's convention above); non-retryable failures fail at once.
+- **Channels** are admin-managed. Secrets are encrypted at rest (AES-GCM, key derived from `ARGUS_JWT_SECRET`, so **changing the JWT secret invalidates stored channel secrets**). The API never returns a plaintext secret: webhook shows only the URL's host and `has_secret`; email shows the SMTP host/from/to; sms shows from/to and the account SID masked after its first 4 characters.
 - **API** (`/api/v1`): viewers read `/alert-rules`, `/alert-events`; editors write `/alert-rules` and list `/channels`; admins write `/channels` and call `POST /channels/{id}/test`.
-- **In the app:** an **Alerts** tab (rules with state badges, last value, enable/disable, editor, history) and a *Notification channels* card in **Settings** for admins.
+- **In the app:** an **Alerts** tab (rules with state badges, last value, enable/disable, editor, history) and a *Notification channels* card in **Settings** for admins, with a type selector (webhook/email/sms) and the matching fields for each.
 
-Limitations: webhook is the only channel type (Slack, email and push are Phase 10). Rule evaluation uses the shared `ruler` query user, so it counts against that user's concurrency limit. The ruler runs inside the server process; run one server per data directory.
+Limitations: Slack and push notifications are still Phase 10 stretch goals. Rule evaluation uses the shared `ruler` query user, so it counts against that user's concurrency limit. The ruler runs inside the server process; run one server per data directory.
 
 ## Performance and hardening (Phase 8)
 

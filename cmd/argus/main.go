@@ -88,7 +88,23 @@ func main() {
 		log.Error("wal open", "err", err)
 		os.Exit(1)
 	}
-	store := chunk.NewLocalStore(filepath.Join(cfg.DataDir, "chunks"))
+	var store chunk.Store
+	switch cfg.ChunkStore {
+	case "s3":
+		s3store, err := chunk.NewS3Store(context.Background(), chunk.S3Config{
+			Bucket:   cfg.S3Bucket,
+			Region:   cfg.S3Region,
+			Endpoint: cfg.S3Endpoint,
+			Prefix:   cfg.S3Prefix,
+		})
+		if err != nil {
+			log.Error("s3 chunk store", "err", err)
+			os.Exit(1)
+		}
+		store = s3store
+	default:
+		store = chunk.NewLocalStore(filepath.Join(cfg.DataDir, "chunks"))
+	}
 	ix := index.New(g)
 	ecfg := ingest.DefaultEngineConfig()
 	ecfg.Log = log
@@ -129,7 +145,11 @@ func main() {
 
 	qsvc := query.NewService(g, store, eng, ql)
 	sealer := notify.NewSealer(cfg.JWTSecret)
-	notifier := &notify.Webhook{Sealer: sealer}
+	notifier := &notify.Router{
+		Webhook: &notify.Webhook{Sealer: sealer},
+		Email:   &notify.Email{Sealer: sealer},
+		SMS:     &notify.SMS{Sealer: sealer},
+	}
 	rl := &ruler.Ruler{
 		DB: g, Notifier: notifier, Log: log,
 		Query: func(ctx context.Context, req query.MetricRequest) (*query.MetricResult, error) {

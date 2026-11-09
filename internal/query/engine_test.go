@@ -62,7 +62,7 @@ type fixture struct {
 	heads *fakeHeads
 	ids   map[string]uint64 // "svc/env" -> stream id
 	n     int
-	all   []loaded          // every line written by load(), for brute-force comparisons
+	all   []loaded // every line written by load(), for brute-force comparisons
 }
 
 func newFixture(t *testing.T) *fixture {

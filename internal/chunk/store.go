@@ -24,6 +24,21 @@ func Key(minTS int64, streamID uint64, chunkID string) string {
 	return fmt.Sprintf("%04d/%02d/%02d/%d/%s.chk", t.Year(), int(t.Month()), t.Day(), streamID, chunkID)
 }
 
+// validateKey rejects keys that are empty, absolute, contain backslashes, or
+// have a "."/".."/empty path segment. Every Store implementation uses this so
+// callers see the same rejections regardless of backend.
+func validateKey(key string) error {
+	if key == "" || strings.HasPrefix(key, "/") || strings.Contains(key, "\\") {
+		return fmt.Errorf("chunk: invalid key %q", key)
+	}
+	for _, part := range strings.Split(key, "/") {
+		if part == "" || part == "." || part == ".." {
+			return fmt.Errorf("chunk: invalid key %q", key)
+		}
+	}
+	return nil
+}
+
 // LocalStore stores chunks under a root directory.
 type LocalStore struct{ root string }
 
@@ -31,13 +46,8 @@ type LocalStore struct{ root string }
 func NewLocalStore(dir string) *LocalStore { return &LocalStore{root: filepath.Clean(dir)} }
 
 func (s *LocalStore) path(key string) (string, error) {
-	if key == "" || strings.HasPrefix(key, "/") || strings.Contains(key, "\\") {
-		return "", fmt.Errorf("chunk: invalid key %q", key)
-	}
-	for _, part := range strings.Split(key, "/") {
-		if part == "" || part == "." || part == ".." {
-			return "", fmt.Errorf("chunk: invalid key %q", key)
-		}
+	if err := validateKey(key); err != nil {
+		return "", err
 	}
 	return filepath.Join(s.root, filepath.FromSlash(key)), nil
 }

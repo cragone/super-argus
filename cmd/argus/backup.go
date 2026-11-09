@@ -52,10 +52,15 @@ func runBackup(args []string, log *slog.Logger) int {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
-	res, err := backup.Run(ctx, g, cfg.DataDir, args[0])
+	res, err := backup.Run(ctx, g, cfg.DataDir, args[0], cfg.ChunkStore == "local")
 	if err != nil {
 		log.Error("backup failed", "err", err)
 		return 1
+	}
+	if res.ChunksNotCopiedReason != "" {
+		log.Warn("backup complete, chunks not covered", "dest", args[0], "db_bytes", res.DBBytes,
+			"wal_files", res.WALFiles, "reason", res.ChunksNotCopiedReason)
+		return 0
 	}
 	log.Info("backup complete", "dest", args[0], "db_bytes", res.DBBytes, "wal_files", res.WALFiles,
 		"chunks_copied", res.ChunksCopied, "chunks_unchanged", res.ChunksSkipped, "chunks_missing", res.MissingChunks)

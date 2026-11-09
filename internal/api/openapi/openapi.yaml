@@ -793,17 +793,33 @@ components:
       required: [name]
       properties:
         name: { type: string }
-        type: { type: string, enum: [webhook], default: webhook }
-        url: { type: string, description: http(s) URL; required on create }
-        secret: { type: string, description: Optional HMAC signing secret (sent as X-Argus-Signature); omit to keep, empty to clear }
+        type: { type: string, enum: [webhook, email, sms], default: webhook }
+        url: { type: string, description: For type webhook, an http(s) URL; required on create }
+        smtp_host: { type: string, description: For type email, the SMTP server host; required on create }
+        smtp_port: { type: integer, description: For type email, the SMTP server port; required on create }
+        username: { type: string, description: For type email, the SMTP username (optional) }
+        account_sid: { type: string, description: For type sms, the Twilio Account SID; required on create }
+        from: { type: string, description: For type email or sms, the sender address or phone number; required on create }
+        to:
+          type: array
+          items: { type: string }
+          description: For type email or sms, the recipient addresses or phone numbers; required on create
+        secret: { type: string, description: The one secret this channel type needs (webhook signing secret, SMTP password, or Twilio auth token); omit to keep, empty to clear }
     Channel:
       type: object
-      required: [id, name, type, url_host, has_secret, created_at, updated_at]
+      required: [id, name, type, has_secret, created_at, updated_at]
       properties:
         id: { type: string }
         name: { type: string }
-        type: { type: string, enum: [webhook] }
-        url_host: { type: string }
+        type: { type: string, enum: [webhook, email, sms] }
+        url_host: { type: string, description: Present for type webhook }
+        smtp_host: { type: string, description: Present for type email }
+        account_sid: { type: string, description: Present for type sms, masked after the first 4 characters }
+        from: { type: string, description: Present for type email or sms }
+        to:
+          type: array
+          items: { type: string }
+          description: Present for type email or sms
         has_secret: { type: boolean }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }

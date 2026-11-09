@@ -102,7 +102,7 @@ in {
 			deps = [ ];
 			text = ''
 				if [ -d ${argusSrc} ]; then
-					export PATH=${pkgs.nodejs_22}/bin:${pkgs.go}/bin:$PATH
+					export PATH=${pkgs.nodejs_22}/bin:${pkgs.bash}/bin:${pkgs.go}/bin:$PATH
 					export HOME=${goCache}
 					export GOCACHE=${goCache}/build
 					export GOPATH=${goCache}/path

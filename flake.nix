@@ -24,6 +24,7 @@
             echo "  (cd app && npm ci && npm run build:web)  # build the Argus client into internal/webui/dist"
             echo "  go run ./cmd/argus       # start the server (reads ./.env)"
             echo "  nix run .#dev-env        # build the client, then start argus + testapp wired together"
+            echo "  go run ./cmd/argus tui   # process-compose dashboard tailing argus/argus-agent logs (mainly for a prod host)"
           '';
         };
 

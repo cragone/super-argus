@@ -85,6 +85,10 @@ in {
 		};
 		users.groups.super-argus = { };
 
+		# Lets an operator run `argus tui` (or `process-compose attach`) from a
+		# login shell on this host without `nix develop`/`nix shell` first.
+		environment.systemPackages = [ pkgs.process-compose ];
+
 		systemd.tmpfiles.rules = [
 			"d ${stateDir} 0750 super-argus super-argus -"
 			"d ${binDir} 0755 root root -"

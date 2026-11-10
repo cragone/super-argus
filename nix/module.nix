@@ -89,8 +89,17 @@ in {
 		# login shell on this host without `nix develop`/`nix shell` first.
 		environment.systemPackages = [ pkgs.process-compose ];
 
+		# binDir is 0755 root:root specifically so any user can exec `argus`
+		# out of it, but that's moot if stateDir itself blocks traversal --
+		# 0750 super-argus:super-argus did exactly that. 0755 here only grants
+		# *traversal* into stateDir; dataDir keeps its own 0700 lockdown
+		# underneath, so this doesn't expose server data.
+		environment.interactiveShellInit = ''
+			export PATH="$PATH:${binDir}"
+		'';
+
 		systemd.tmpfiles.rules = [
-			"d ${stateDir} 0750 super-argus super-argus -"
+			"d ${stateDir} 0755 super-argus super-argus -"
 			"d ${binDir} 0755 root root -"
 			"d ${cfg.dataDir} 0700 super-argus super-argus -"
 			"d ${buildDir} 0755 root root -"

@@ -1,6 +1,6 @@
 # argus-agent
 
-Run it on a host or node and everything running there shows up in Argus under **Services**. There is nothing to configure per service.
+Run it on a host or node and everything running there shows up in Argus under **Services**. Pods are discovered automatically; systemd units are collected only when listed in `ARGUS_JOURNAL_UNITS`.
 
 | Mode | Source | Service name |
 |------|--------|--------------|
@@ -18,6 +18,7 @@ Pod and workload names come from the log file path, not the Kubernetes API, so t
 | `ARGUS_API_KEY` | required | ingest key (`POST /api/v1/api-keys` as admin) |
 | `ARGUS_URL` | `http://localhost:8080` | Argus base URL |
 | `ARGUS_AGENT_MODE` | `auto` | `auto`, `journal` or `kubernetes` |
+| `ARGUS_JOURNAL_UNITS` | (required in journal mode) | comma-separated systemd units to collect, e.g. `nginx,cups.service`; other units, the kernel and scopes are not read |
 | `ARGUS_LABELS` | | extra labels for every stream: `env=prod,cluster=a` |
 | `ARGUS_EXCLUDE_NAMESPACES` | | comma list of namespaces to skip (Kubernetes) |
 | `ARGUS_PODS_DIR` | `/var/log/pods` | pod log root |

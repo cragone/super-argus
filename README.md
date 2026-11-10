@@ -221,7 +221,7 @@ The **Services** tab lists every value of the `service` label that has shipped l
 
 `GET /api/v1/services` backs the list (optional `start`, `end`, and `label` to use a label other than `service`). Volume counts flushed chunks only, so it can lag the newest lines slightly.
 
-To get systemd units and Kubernetes pods in without configuring each one, run [`agent/`](agent/README.md) on the host or node. SDKs and Loki clients (Alloy, Promtail) work too, as long as they set a `service` label.
+To get Kubernetes pods in automatically, and the systemd units you name in `ARGUS_JOURNAL_UNITS`, run [`agent/`](agent/README.md) on the host or node. SDKs and Loki clients (Alloy, Promtail) work too, as long as they set a `service` label.
 
 ## Client SDKs and Loki-compatible push (Phase 9)
 

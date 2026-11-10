@@ -84,6 +84,20 @@ func TestParseJournalLine(t *testing.T) {
 	}
 }
 
+func TestJournalArgs(t *testing.T) {
+	got := strings.Join(journalArgs("", []string{"a.service", "b.service"}), " ")
+	if got != "-o json --no-pager -f -u a.service -u b.service -n 0" {
+		t.Fatalf("args = %q", got)
+	}
+	got = strings.Join(journalArgs("s=1", []string{"a.service"}), " ")
+	if got != "-o json --no-pager -f -u a.service --after-cursor=s=1" {
+		t.Fatalf("args = %q", got)
+	}
+	if normalizeUnit("nginx") != "nginx.service" || normalizeUnit("x.timer") != "x.timer" {
+		t.Fatal("normalizeUnit")
+	}
+}
+
 // receiver is a fake Argus ingest endpoint collecting decoded NDJSON lines.
 type receiver struct {
 	mu    sync.Mutex

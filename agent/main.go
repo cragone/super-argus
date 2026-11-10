@@ -1,6 +1,6 @@
 // Command argus-agent discovers running workloads on a host and ships their
-// logs to Argus. Nothing is configured per service: systemd units (journald)
-// and Kubernetes pods (/var/log/pods) appear in Argus as soon as they log.
+// logs to Argus. Kubernetes pods (/var/log/pods) appear as soon as they log;
+// systemd units (journald) are collected only when named in ARGUS_JOURNAL_UNITS.
 package main
 
 import (
@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"sort"
 	"strings"
 	"syscall"
 	"time"
@@ -68,6 +69,17 @@ func main() {
 		log.Fatal("argus-agent: nothing to collect: no " + podsDir + " and no journalctl (set ARGUS_AGENT_MODE=kubernetes|journal)")
 	}
 
+	var units []string
+	if mode == "journal" {
+		for u := range parseSet(os.Getenv("ARGUS_JOURNAL_UNITS")) {
+			units = append(units, normalizeUnit(u))
+		}
+		if len(units) == 0 {
+			log.Fatal("argus-agent: journal mode needs ARGUS_JOURNAL_UNITS (comma-separated systemd units to collect)")
+		}
+		sort.Strings(units)
+	}
+
 	stateDir := env("ARGUS_STATE_DIR", "/var/lib/argus-agent")
 	if err := os.MkdirAll(stateDir, 0o755); err != nil {
 		stateDir = filepath.Join(os.TempDir(), "argus-agent")
@@ -99,7 +111,7 @@ func main() {
 	case "kubernetes":
 		runKubernetes(ctx, hub, st, podsDir, parseSet(env("ARGUS_EXCLUDE_NAMESPACES", "")))
 	case "journal":
-		runJournal(ctx, hub, st)
+		runJournal(ctx, hub, st, units)
 	}
 
 	// flush what is queued and remember where we stopped

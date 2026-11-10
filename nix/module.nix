@@ -189,9 +189,11 @@ in {
 				RestartSec = 5;
 				DynamicUser = true;
 				StateDirectory = "argus-agent";
-				# Reading the whole journal needs this group (same as the agent's
-				# own shipped unit template).
-				SupplementaryGroups = [ "systemd-journal" ];
+				# systemd-journal to read the journal; super-argus because binDir's
+				# parent (stateDir, 0750 super-argus:super-argus) isn't traversable
+				# otherwise -- DynamicUser gets its own ephemeral group by default,
+				# not this service's static one.
+				SupplementaryGroups = [ "systemd-journal" "super-argus" ];
 				NoNewPrivileges = true;
 				ProtectSystem = "strict";
 				ProtectHome = true;

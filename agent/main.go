@@ -106,6 +106,12 @@ func main() {
 		}
 	}()
 
+	if env("ARGUS_ACTIONS_ENABLED", "") == "true" {
+		if r := newActionRunner(url, key, mode, podsDir); r != nil {
+			go r.run(ctx)
+		}
+	}
+
 	log.Printf("argus-agent: mode=%s url=%s", mode, url)
 	switch mode {
 	case "kubernetes":

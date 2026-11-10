@@ -574,6 +574,127 @@ paths:
                   ok: { type: boolean }
                   error: { type: string }
         '404': { $ref: '#/components/responses/Error' }
+  /services/{name}/restart:
+    post:
+      operationId: restartService
+      summary: Queue a restart of a systemd unit or pod (admin)
+      description: The kind and target are derived from the stream labels; an agent on the owning host or node executes it.
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RestartRequest' }
+      responses:
+        '202':
+          description: Queued
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Action' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /services/{name}/restart-targets:
+    get:
+      operationId: listRestartTargets
+      summary: What can be restarted for a service, from its recently active streams (admin)
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Targets (empty if the service has no restartable streams)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/RestartTarget' }
+        '403': { $ref: '#/components/responses/Error' }
+  /actions:
+    get:
+      operationId: listActions
+      summary: Recent restart actions, newest first (admin)
+      responses:
+        '200':
+          description: Actions
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Action' }
+  /actions/{id}:
+    get:
+      operationId: getAction
+      summary: One restart action (admin)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Action
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Action' }
+        '404': { $ref: '#/components/responses/Error' }
+  /agent/actions/pending:
+    get:
+      operationId: agentPendingActions
+      summary: Long-poll for actions an agent may run
+      security: [ { apiKey: [] } ]
+      parameters:
+        - { name: host, in: query, required: false, schema: { type: string }, description: The agent's host label; systemd actions are filtered to it }
+      responses:
+        '200':
+          description: Pending actions (empty after the poll window)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Action' }
+        '401': { $ref: '#/components/responses/Error' }
+  /agent/actions/{id}/claim:
+    post:
+      operationId: agentClaimAction
+      summary: Claim a pending action for this agent
+      security: [ { apiKey: [] } ]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '204': { description: Claimed }
+        '401': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /agent/actions/{id}/result:
+    post:
+      operationId: agentActionResult
+      summary: Report the outcome of a claimed action
+      security: [ { apiKey: [] } ]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ok]
+              properties:
+                ok: { type: boolean }
+                result: { type: string }
+      responses:
+        '204': { description: Recorded }
+        '401': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
 security:
   - bearer: []
 components:
@@ -590,6 +711,35 @@ components:
         application/json:
           schema: { $ref: '#/components/schemas/ErrorBody' }
   schemas:
+    RestartRequest:
+      type: object
+      required: [labels]
+      properties:
+        labels:
+          type: object
+          additionalProperties: { type: string }
+          description: Labels of the stream being viewed (source, host, unit, namespace, pod)
+    RestartTarget:
+      type: object
+      required: [kind, target, labels, last_seen]
+      properties:
+        kind: { type: string, enum: [systemd_restart, k8s_restart] }
+        target: { type: object, additionalProperties: { type: string } }
+        labels: { type: object, additionalProperties: { type: string }, description: Send these as the restart request's labels }
+        last_seen: { type: string, format: date-time }
+    Action:
+      type: object
+      required: [id, kind, service, target, status, requested_by, requested_at]
+      properties:
+        id: { type: string }
+        kind: { type: string, enum: [systemd_restart, k8s_restart] }
+        service: { type: string }
+        target: { type: object, additionalProperties: { type: string } }
+        status: { type: string, enum: [pending, running, succeeded, failed, expired] }
+        requested_by: { type: string }
+        requested_at: { type: string, format: date-time }
+        finished_at: { type: string, format: date-time }
+        result: { type: string }
     ErrorBody:
       type: object
       required: [error]

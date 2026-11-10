@@ -19,8 +19,11 @@ const usage = `usage: argus [command]
                      (incremental: run it again to the same <dir> to update it)
   tui                process-compose dashboard tailing the argus/argus-agent
                      systemd logs side by side (needs process-compose on PATH;
-                     read-only monitoring, not process control -- use systemctl
-                     to actually restart a service)
+                     read-only monitoring, not process control)
+  restart <service>  ask the server to restart a systemd unit or pod via its
+                     agent and wait for the result (admin; set ARGUS_EMAIL and
+                     ARGUS_PASSWORD, and ARGUS_URL if not localhost:8080).
+                     flags: -url, -target N (when there are several), -yes
 `
 
 // runCommand runs a subcommand and returns the process exit code.
@@ -30,6 +33,8 @@ func runCommand(name string, args []string, log *slog.Logger) int {
 		return runBackup(args, log)
 	case "tui":
 		return runTUI(args, log)
+	case "restart":
+		return runRestart(args, log)
 	case "help", "-h", "--help":
 		fmt.Print(usage)
 		return 0

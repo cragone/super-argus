@@ -78,6 +78,10 @@ func NewRouter(s *Server) http.Handler {
 			r.Post("/ingest/push", s.Ingest.Push)
 			r.Post("/ingest/loki", s.Ingest.Loki)
 		}
+		// Agent command channel: authenticated by API key, not a user session.
+		r.Get("/agent/actions/pending", s.agentPending)
+		r.Post("/agent/actions/{id}/claim", s.agentClaim)
+		r.Post("/agent/actions/{id}/result", s.agentResult)
 
 		r.Group(func(r chi.Router) {
 			r.Use(s.Authenticate)
@@ -130,6 +134,10 @@ func NewRouter(s *Server) http.Handler {
 				r.Put("/channels/{id}", s.updateChannel)
 				r.Delete("/channels/{id}", s.deleteChannel)
 				r.Post("/channels/{id}/test", s.testChannel)
+				r.Post("/services/{name}/restart", s.requestRestart)
+				r.Get("/services/{name}/restart-targets", s.restartTargets)
+				r.Get("/actions", s.listActions)
+				r.Get("/actions/{id}", s.getAction)
 			})
 		})
 	})

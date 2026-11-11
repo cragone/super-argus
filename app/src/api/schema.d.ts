@@ -493,10 +493,168 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/services/{name}/restart": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Queue a restart of a systemd unit or pod (admin)
+         * @description The kind and target are derived from the stream labels; an agent on the owning host or node executes it.
+         */
+        post: operations["restartService"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/services/{name}/restart-targets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What can be restarted for a service, from its recently active streams (admin) */
+        get: operations["listRestartTargets"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/actions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Recent restart actions, newest first (admin) */
+        get: operations["listActions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/actions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One restart action (admin) */
+        get: operations["getAction"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/agent/actions/pending": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Long-poll for actions an agent may run */
+        get: operations["agentPendingActions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/agent/actions/{id}/claim": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Claim a pending action for this agent */
+        post: operations["agentClaimAction"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/agent/actions/{id}/result": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Report the outcome of a claimed action */
+        post: operations["agentActionResult"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        RestartRequest: {
+            /** @description Labels of the stream being viewed (source, host, unit, namespace, pod) */
+            labels: {
+                [key: string]: string;
+            };
+        };
+        RestartTarget: {
+            /** @enum {string} */
+            kind: "systemd_restart" | "k8s_restart";
+            target: {
+                [key: string]: string;
+            };
+            /** @description Send these as the restart request's labels */
+            labels: {
+                [key: string]: string;
+            };
+            /** Format: date-time */
+            last_seen: string;
+        };
+        Action: {
+            id: string;
+            /** @enum {string} */
+            kind: "systemd_restart" | "k8s_restart";
+            service: string;
+            target: {
+                [key: string]: string;
+            };
+            /** @enum {string} */
+            status: "pending" | "running" | "succeeded" | "failed" | "expired";
+            requested_by: string;
+            /** Format: date-time */
+            requested_at: string;
+            /** Format: date-time */
+            finished_at?: string;
+            result?: string;
+        };
         ErrorBody: {
             error: {
                 code: string;
@@ -1787,6 +1945,182 @@ export interface operations {
                 };
             };
             404: components["responses"]["Error"];
+        };
+    };
+    restartService: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RestartRequest"];
+            };
+        };
+        responses: {
+            /** @description Queued */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Action"];
+                };
+            };
+            400: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+        };
+    };
+    listRestartTargets: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Targets (empty if the service has no restartable streams) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["RestartTarget"][];
+                    };
+                };
+            };
+            403: components["responses"]["Error"];
+        };
+    };
+    listActions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Actions */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["Action"][];
+                    };
+                };
+            };
+        };
+    };
+    getAction: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Action */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Action"];
+                };
+            };
+            404: components["responses"]["Error"];
+        };
+    };
+    agentPendingActions: {
+        parameters: {
+            query?: {
+                /** @description The agent's host label; systemd actions are filtered to it */
+                host?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Pending actions (empty after the poll window) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["Action"][];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+        };
+    };
+    agentClaimAction: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Claimed */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+        };
+    };
+    agentActionResult: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    ok: boolean;
+                    result?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Recorded */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Error"];
+            409: components["responses"]["Error"];
         };
     };
 }

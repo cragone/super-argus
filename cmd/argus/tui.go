@@ -15,7 +15,7 @@ import (
 // "attach" to anything already running -- it's its own short-lived
 // process-compose session just for the dashboard. Killing/restarting a
 // process in the TUI only restarts that log tail, not the real
-// systemd-managed service; use systemctl for that.
+// systemd-managed service; use `argus restart <service>` for that.
 const tuiConfig = `version: "0.5"
 processes:
   argus:

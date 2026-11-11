@@ -62,6 +62,25 @@ in {
 				description = "ARGUS_AGENT_MODE: \"auto\", \"journal\", or \"kubernetes\".";
 			};
 
+			actions = {
+				enable = lib.mkOption {
+					type = lib.types.bool;
+					default = false;
+					description = ''
+						Let admins restart the units listed in `units` from the Argus UI/API.
+						The agent polls the server for requests (it opens no port) and a
+						polkit rule lets only its dynamic user restart exactly those units.
+					'';
+				};
+
+				units = lib.mkOption {
+					type = lib.types.listOf lib.types.str;
+					default = [ ];
+					example = [ "nginx.service" ];
+					description = "Full unit names (with .service) the agent may restart. Empty means nothing is restartable.";
+				};
+			};
+
 			environmentFile = lib.mkOption {
 				type = lib.types.str;
 				default = "/etc/super-argus/agent-env";
@@ -189,6 +208,9 @@ in {
 
 			environment = {
 				ARGUS_AGENT_MODE = cfg.agent.mode;
+			} // lib.optionalAttrs cfg.agent.actions.enable {
+				ARGUS_ACTIONS_ENABLED = "true";
+				ARGUS_ACTION_UNITS = lib.concatStringsSep "," cfg.agent.actions.units;
 			};
 
 			serviceConfig = {
@@ -207,6 +229,22 @@ in {
 				ProtectSystem = "strict";
 				ProtectHome = true;
 			};
+		};
+
+		# The agent runs unprivileged (DynamicUser = argus-agent); this is the only
+		# thing that lets it restart anything, and only the listed units.
+		security.polkit = lib.mkIf (cfg.agent.enable && cfg.agent.actions.enable) {
+			enable = true;
+			extraConfig = ''
+				polkit.addRule(function(action, subject) {
+					if (action.id == "org.freedesktop.systemd1.manage-units" &&
+					    subject.user == "argus-agent" &&
+					    action.lookup("verb") == "restart" &&
+					    ${builtins.toJSON cfg.agent.actions.units}.indexOf(action.lookup("unit")) >= 0) {
+						return polkit.Result.YES;
+					}
+				});
+			'';
 		};
 	};
 }

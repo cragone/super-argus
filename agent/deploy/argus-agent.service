@@ -7,6 +7,10 @@ Wants=network-online.target
 # ARGUS_URL=http://argus:8080 and ARGUS_API_KEY=argus_xxx live in this file
 EnvironmentFile=/etc/argus-agent.env
 Environment=ARGUS_AGENT_MODE=journal
+Environment=ARGUS_JOURNAL_UNITS=your-service.service
+# Optional: let Argus admins restart units. Also needs deploy/argus-agent.rules.
+#Environment=ARGUS_ACTIONS_ENABLED=true
+#Environment=ARGUS_ACTION_UNITS=your-service.service
 Environment=ARGUS_STATE_DIR=/var/lib/argus-agent
 ExecStart=/usr/local/bin/argus-agent
 Restart=always

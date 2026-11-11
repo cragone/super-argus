@@ -62,6 +62,25 @@ in {
 				description = "ARGUS_AGENT_MODE: \"auto\", \"journal\", or \"kubernetes\".";
 			};
 
+			actions = {
+				enable = lib.mkOption {
+					type = lib.types.bool;
+					default = false;
+					description = ''
+						Let admins restart the units listed in `units` from the Argus UI/API.
+						The agent polls the server for requests (it opens no port) and a
+						polkit rule lets only its dynamic user restart exactly those units.
+					'';
+				};
+
+				units = lib.mkOption {
+					type = lib.types.listOf lib.types.str;
+					default = [ ];
+					example = [ "nginx.service" ];
+					description = "Full unit names (with .service) the agent may restart. Empty means nothing is restartable.";
+				};
+			};
+
 			environmentFile = lib.mkOption {
 				type = lib.types.str;
 				default = "/etc/super-argus/agent-env";
@@ -89,8 +108,17 @@ in {
 		# login shell on this host without `nix develop`/`nix shell` first.
 		environment.systemPackages = [ pkgs.process-compose ];
 
+		# binDir is 0755 root:root specifically so any user can exec `argus`
+		# out of it, but that's moot if stateDir itself blocks traversal --
+		# 0750 super-argus:super-argus did exactly that. 0755 here only grants
+		# *traversal* into stateDir; dataDir keeps its own 0700 lockdown
+		# underneath, so this doesn't expose server data.
+		environment.interactiveShellInit = ''
+			export PATH="$PATH:${binDir}"
+		'';
+
 		systemd.tmpfiles.rules = [
-			"d ${stateDir} 0750 super-argus super-argus -"
+			"d ${stateDir} 0755 super-argus super-argus -"
 			"d ${binDir} 0755 root root -"
 			"d ${cfg.dataDir} 0700 super-argus super-argus -"
 			"d ${buildDir} 0755 root root -"
@@ -102,7 +130,7 @@ in {
 			deps = [ ];
 			text = ''
 				if [ -d ${argusSrc} ]; then
-					export PATH=${pkgs.nodejs_22}/bin:${pkgs.go}/bin:$PATH
+					export PATH=${pkgs.nodejs_22}/bin:${pkgs.bash}/bin:${pkgs.go}/bin:$PATH
 					export HOME=${goCache}
 					export GOCACHE=${goCache}/build
 					export GOPATH=${goCache}/path
@@ -180,6 +208,9 @@ in {
 
 			environment = {
 				ARGUS_AGENT_MODE = cfg.agent.mode;
+			} // lib.optionalAttrs cfg.agent.actions.enable {
+				ARGUS_ACTIONS_ENABLED = "true";
+				ARGUS_ACTION_UNITS = lib.concatStringsSep "," cfg.agent.actions.units;
 			};
 
 			serviceConfig = {
@@ -189,13 +220,31 @@ in {
 				RestartSec = 5;
 				DynamicUser = true;
 				StateDirectory = "argus-agent";
-				# Reading the whole journal needs this group (same as the agent's
-				# own shipped unit template).
-				SupplementaryGroups = [ "systemd-journal" ];
+				# systemd-journal to read the journal; super-argus because binDir's
+				# parent (stateDir, 0750 super-argus:super-argus) isn't traversable
+				# otherwise -- DynamicUser gets its own ephemeral group by default,
+				# not this service's static one.
+				SupplementaryGroups = [ "systemd-journal" "super-argus" ];
 				NoNewPrivileges = true;
 				ProtectSystem = "strict";
 				ProtectHome = true;
 			};
+		};
+
+		# The agent runs unprivileged (DynamicUser = argus-agent); this is the only
+		# thing that lets it restart anything, and only the listed units.
+		security.polkit = lib.mkIf (cfg.agent.enable && cfg.agent.actions.enable) {
+			enable = true;
+			extraConfig = ''
+				polkit.addRule(function(action, subject) {
+					if (action.id == "org.freedesktop.systemd1.manage-units" &&
+					    subject.user == "argus-agent" &&
+					    action.lookup("verb") == "restart" &&
+					    ${builtins.toJSON cfg.agent.actions.units}.indexOf(action.lookup("unit")) >= 0) {
+						return polkit.Result.YES;
+					}
+				});
+			'';
 		};
 	};
 }

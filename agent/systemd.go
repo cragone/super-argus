@@ -9,11 +9,18 @@ import (
 	"github.com/coreos/go-systemd/v22/dbus"
 )
 
-// runSystemdLiveness polls systemd over D-Bus for every unit's ActiveState
-// and SubState, reusing journalService() so a unit's liveness lines up with
-// the service name its journal lines are already filed under. Nothing is
-// configured per unit, matching the rest of the agent.
-func runSystemdLiveness(ctx context.Context, report *LivenessReporter, interval time.Duration) {
+// runSystemdLiveness polls systemd over D-Bus for the ActiveState/SubState of
+// exactly the units named in ARGUS_JOURNAL_UNITS, reusing journalService() so
+// a unit's liveness lines up with the service name its journal lines are
+// already filed under. It deliberately does not report on every unit on the
+// host: journal mode only collects the units it is told to (see
+// agent/journal.go), and liveness follows the same allowlist rather than
+// surfacing services nothing is logging.
+func runSystemdLiveness(ctx context.Context, report *LivenessReporter, interval time.Duration, units []string) {
+	allowed := make(map[string]bool, len(units))
+	for _, u := range units {
+		allowed[u] = true
+	}
 	conn, err := dbus.NewSystemConnectionContext(ctx)
 	if err != nil {
 		log.Printf("argus-agent: systemd liveness: connect to dbus: %v", err)
@@ -24,7 +31,7 @@ func runSystemdLiveness(ctx context.Context, report *LivenessReporter, interval 
 	t := time.NewTicker(interval)
 	defer t.Stop()
 	for ctx.Err() == nil {
-		pollSystemdUnits(ctx, conn, report)
+		pollSystemdUnits(ctx, conn, report, allowed)
 		select {
 		case <-ctx.Done():
 			return
@@ -33,16 +40,18 @@ func runSystemdLiveness(ctx context.Context, report *LivenessReporter, interval 
 	}
 }
 
-// pollSystemdUnits reports liveness for every ".service" unit systemd knows
-// about. Other unit types (sockets, timers, mounts, targets) are skipped —
-// they are not what "service" means on the Services page.
-func pollSystemdUnits(ctx context.Context, conn *dbus.Conn, report *LivenessReporter) {
+// pollSystemdUnits reports liveness for every unit in allowed. Units not in
+// the allowlist are skipped, same as journal mode's own log collection.
+func pollSystemdUnits(ctx context.Context, conn *dbus.Conn, report *LivenessReporter, allowed map[string]bool) {
 	units, err := conn.ListUnitsContext(ctx)
 	if err != nil {
 		log.Printf("argus-agent: systemd liveness: list units: %v", err)
 		return
 	}
 	for _, u := range units {
+		if !allowed[u.Name] {
+			continue
+		}
 		if name, alive, ok := systemdServicePing(u); ok {
 			report.Report(name, "systemd", alive, u.SubState)
 		}

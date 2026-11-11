@@ -36,6 +36,25 @@ roleRef:
   name: argus-agent
   apiGroup: rbac.authorization.k8s.io
 ---
+# Only used when restart actions are enabled (ARGUS_ACTIONS_ENABLED below). The
+# ClusterRole grants nothing by itself: bind it with a RoleBinding in each
+# namespace the agent may restart things in, and list the same namespaces in
+# ARGUS_ACTION_NAMESPACES. See the commented example at the end of this file.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: argus-agent-restart
+rules:
+  - apiGroups: [""]
+    resources: [pods]
+    verbs: [get, delete] # delete only for pods with no owner
+  - apiGroups: [apps]
+    resources: [replicasets]
+    verbs: [get]
+  - apiGroups: [apps]
+    resources: [deployments, statefulsets, daemonsets]
+    verbs: [get, patch] # patch = rolling restart
+---
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
@@ -71,6 +90,9 @@ spec:
             - name: ARGUS_NODE_NAME # scopes the pod-liveness watch to this node
               valueFrom:
                 fieldRef: { fieldPath: spec.nodeName }
+            # Let Argus admins restart workloads. Off unless enabled AND a namespace is listed.
+            # - { name: ARGUS_ACTIONS_ENABLED, value: "true" }
+            # - { name: ARGUS_ACTION_NAMESPACES, value: prod }
           resources:
             requests: { cpu: 50m, memory: 64Mi }
             limits: { memory: 256Mi }
@@ -82,3 +104,12 @@ spec:
           hostPath: { path: /var/log/pods }
         - name: state
           hostPath: { path: /var/lib/argus-agent, type: DirectoryOrCreate }
+# --- optional: allow restarts in one namespace (repeat per namespace) ---
+# apiVersion: rbac.authorization.k8s.io/v1
+# kind: RoleBinding
+# metadata:
+#   name: argus-agent-restart
+#   namespace: prod
+# roleRef: { apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: argus-agent-restart }
+# subjects:
+#   - { kind: ServiceAccount, name: argus-agent, namespace: argus }

@@ -19,7 +19,7 @@ import (
 var tablesInDeleteOrder = []string{
 	"alert_events", "alert_states", "alert_rules", "notification_channels",
 	"panels", "dashboards", "saved_queries",
-	"chunks", "stream_labels", "streams", "service_liveness",
+	"chunks", "stream_labels", "streams", "service_liveness", "actions",
 	"api_keys", "users", "settings",
 }
 

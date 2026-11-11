@@ -1,0 +1,13 @@
+// Lets the argus-agent service (DynamicUser=yes, so the user is named after the
+// unit) restart ONLY the listed units. Install, then edit the list:
+//   sudo cp argus-agent.rules /etc/polkit-1/rules.d/50-argus-agent.rules
+// and set ARGUS_ACTIONS_ENABLED=true and the same units in ARGUS_ACTION_UNITS.
+polkit.addRule(function(action, subject) {
+    var allowed = ["your-service.service"];
+    if (action.id == "org.freedesktop.systemd1.manage-units" &&
+        subject.user == "argus-agent" &&
+        action.lookup("verb") == "restart" &&
+        allowed.indexOf(action.lookup("unit")) >= 0) {
+        return polkit.Result.YES;
+    }
+});

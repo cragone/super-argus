@@ -87,11 +87,11 @@ func parseJournalLine(raw []byte) (labels map[string]string, ts time.Time, line,
 }
 
 // runJournal follows journald until ctx ends, restarting journalctl if it exits.
-func runJournal(ctx context.Context, hub *Hub, st *State) {
+func runJournal(ctx context.Context, hub *Hub, st *State, units []string) {
 	backoff := time.Second
 	for ctx.Err() == nil {
 		started := time.Now()
-		if err := followJournal(ctx, hub, st); err != nil && ctx.Err() == nil {
+		if err := followJournal(ctx, hub, st, units); err != nil && ctx.Err() == nil {
 			log.Printf("argus-agent: journalctl: %v", err)
 		}
 		if time.Since(started) > time.Minute {
@@ -108,13 +108,35 @@ func runJournal(ctx context.Context, hub *Hub, st *State) {
 	}
 }
 
-func followJournal(ctx context.Context, hub *Hub, st *State) error {
+// normalizeUnit appends ".service" to bare unit names ("nginx" -> "nginx.service").
+func normalizeUnit(u string) string {
+	if strings.Contains(u, ".") {
+		return u
+	}
+	return u + ".service"
+}
+
+// journalArgs builds the journalctl arguments, matching only the given units.
+// journalctl ORs repeated -u flags.
+func journalArgs(cursor string, units []string) []string {
 	args := []string{"-o", "json", "--no-pager", "-f"}
-	if c := st.GetCursor(); c != "" {
-		args = append(args, "--after-cursor="+c)
+	for _, u := range units {
+		args = append(args, "-u", u)
+	}
+	if cursor != "" {
+		args = append(args, "--after-cursor="+cursor)
 	} else {
 		args = append(args, "-n", "0") // first run: only new lines, not the whole journal
 	}
+	return args
+}
+
+func followJournal(ctx context.Context, hub *Hub, st *State, units []string) error {
+	want := make(map[string]bool, len(units))
+	for _, u := range units {
+		want[u] = true
+	}
+	args := journalArgs(st.GetCursor(), units)
 	cmd := exec.CommandContext(ctx, "journalctl", args...)
 	out, err := cmd.StdoutPipe()
 	if err != nil {

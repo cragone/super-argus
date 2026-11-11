@@ -291,3 +291,40 @@ type ServiceLiveness struct {
 
 // TableName overrides GORM's default pluralization ("service_livenesses").
 func (ServiceLiveness) TableName() string { return "service_liveness" }
+
+// Action kinds and statuses for the restart-action queue.
+const (
+	ActionSystemdRestart = "systemd_restart"
+	ActionK8sRestart     = "k8s_restart"
+
+	ActionPending   = "pending"
+	ActionRunning   = "running"
+	ActionSucceeded = "succeeded"
+	ActionFailed    = "failed"
+	ActionExpired   = "expired"
+)
+
+// Action is a requested service restart: the queue agents poll and the audit trail.
+// Target is a JSON object of the stream labels (host, unit, namespace, pod...)
+// that pick the agent and the thing to restart.
+type Action struct {
+	ID          string `gorm:"primaryKey"`
+	Kind        string
+	Service     string
+	Target      string
+	Status      string
+	RequestedBy string
+	RequestedAt time.Time
+	ClaimedBy   string
+	ClaimedAt   *time.Time
+	FinishedAt  *time.Time
+	Result      string
+}
+
+// BeforeCreate assigns a UUID if none is set.
+func (a *Action) BeforeCreate(*gorm.DB) error {
+	if a.ID == "" {
+		a.ID = uuid.NewString()
+	}
+	return nil
+}

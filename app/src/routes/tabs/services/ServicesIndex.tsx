@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 
 import { errorMessage } from '@/api/client';
 import { Card, ErrorText } from '@/components/ui';
+import { LivenessBadge } from '@/components/LivenessBadge';
 import { useServices } from '@/hooks/useLogs';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { formatDateTime } from '@/lib/time';
@@ -43,7 +44,11 @@ export function ServicesIndex() {
           style={{ background: 'none', border: 0, padding: 0, textAlign: 'left', cursor: 'pointer' }}>
           <Card style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: s.active ? t.levels.info : t.textDim }} />
+              {s.liveness_state ? (
+                <LivenessBadge state={s.liveness_state} />
+              ) : (
+                <span style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: s.active ? t.levels.info : t.textDim }} />
+              )}
               <span style={{ color: t.text, fontSize: 16, fontWeight: 600, flex: 1 }}>{s.name}</span>
               <span style={{ color: t.textDim, fontSize: 12 }}>{s.active ? 'active' : `seen ${ago(s.last_seen)}`}</span>
             </div>

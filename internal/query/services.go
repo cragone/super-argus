@@ -21,6 +21,11 @@ type ServiceInfo struct {
 	Streams   int       `json:"streams"`
 	Lines     int64     `json:"lines"`
 	Bytes     int64     `json:"bytes"`
+	// LivenessState is "alive", "down" or "unknown" when an agent's systemd or
+	// Kubernetes collector has reported for this service, nil otherwise (e.g.
+	// a service shipping logs directly via an SDK, with no collector running).
+	// Distinct from Active, which only reflects recent log volume.
+	LivenessState *string `json:"liveness_state,omitempty"`
 }
 
 // Services lists the values of the label `key` as services, with activity and
@@ -102,9 +107,27 @@ func (s *Service) Services(ctx context.Context, key string, start, end int64, no
 		}
 	}
 
+	names := make([]string, 0, len(byName))
+	for name := range byName {
+		names = append(names, name)
+	}
+	liveness := map[string]string{}
+	if len(names) > 0 {
+		var rows []models.ServiceLiveness
+		if err := s.DB.WithContext(ctx).Where("service IN ?", names).Find(&rows).Error; err != nil {
+			return nil, err
+		}
+		for _, r := range rows {
+			liveness[r.Service] = r.State
+		}
+	}
+
 	out := make([]ServiceInfo, 0, len(byName))
 	for _, info := range byName {
 		info.Active = now.Sub(info.LastSeen) <= ServiceActiveWindow
+		if state, ok := liveness[info.Name]; ok {
+			info.LivenessState = &state
+		}
 		out = append(out, *info)
 	}
 	sort.Slice(out, func(i, j int) bool {

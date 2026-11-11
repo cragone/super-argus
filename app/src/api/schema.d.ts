@@ -150,6 +150,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/ingest/liveness": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Report per-service liveness (systemd/Kubernetes collectors)
+         * @description Sent by the Argus agent's systemd or Kubernetes liveness collectors, distinct from log ingest: it says whether the unit/pod is actually running, not whether it has logged recently. Agents send a heartbeat on every poll, not only on change.
+         */
+        post: operations["ingestLiveness"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/query/range": {
         parameters: {
             query?: never;
@@ -554,6 +574,21 @@ export interface components {
             sampled?: number;
             errors?: string[];
         };
+        LivenessPing: {
+            service: string;
+            /** @enum {string} */
+            source: "systemd" | "kubernetes";
+            alive: boolean;
+            detail?: string;
+        };
+        LivenessRequest: {
+            pings: components["schemas"]["LivenessPing"][];
+        };
+        LivenessResponse: {
+            accepted: number;
+            rejected: number;
+            errors?: string[];
+        };
         ServiceList: {
             label: string;
             data: components["schemas"]["Service"][];
@@ -574,6 +609,11 @@ export interface components {
             lines: number;
             /** Format: int64 */
             bytes: number;
+            /**
+             * @description From a systemd/Kubernetes collector, distinct from `active`'s log recency. Absent when no collector has reported for this service.
+             * @enum {string}
+             */
+            liveness_state?: "alive" | "down" | "unknown";
         };
         StringList: {
             data: string[];
@@ -1044,6 +1084,32 @@ export interface operations {
             401: components["responses"]["Error"];
             413: components["responses"]["Error"];
             429: components["responses"]["Error"];
+        };
+    };
+    ingestLiveness: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LivenessRequest"];
+            };
+        };
+        responses: {
+            /** @description Accepted (possibly with some rejected pings) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LivenessResponse"];
+                };
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
         };
     };
     queryRange: {

@@ -267,3 +267,27 @@ func (e *AlertEvent) BeforeCreate(*gorm.DB) error {
 	}
 	return nil
 }
+
+// Liveness states for ServiceLiveness.State.
+const (
+	LivenessAlive   = "alive"
+	LivenessDown    = "down"
+	LivenessUnknown = "unknown"
+)
+
+// ServiceLiveness is the latest liveness report for one service, as reported
+// by an agent's systemd or Kubernetes collector (distinct from "has logged
+// recently" — see query.ServiceInfo.Active). One row per service; a newer
+// report overwrites the older one, and the server itself flips State to
+// LivenessUnknown once LastHeartbeat goes stale.
+type ServiceLiveness struct {
+	Service       string `gorm:"primaryKey"`
+	Source        string
+	State         string
+	Detail        string
+	LastHeartbeat time.Time `gorm:"column:last_heartbeat"`
+	UpdatedAt     time.Time
+}
+
+// TableName overrides GORM's default pluralization ("service_livenesses").
+func (ServiceLiveness) TableName() string { return "service_liveness" }

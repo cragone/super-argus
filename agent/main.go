@@ -79,6 +79,15 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	liveness := NewLivenessReporter(url, key)
+	go liveness.Run(ctx, 15*time.Second)
+	switch mode {
+	case "kubernetes":
+		go runK8sLiveness(ctx, liveness)
+	case "journal":
+		go runSystemdLiveness(ctx, liveness, 10*time.Second)
+	}
+
 	go func() {
 		t := time.NewTicker(5 * time.Second)
 		defer t.Stop()

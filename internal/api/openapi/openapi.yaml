@@ -146,6 +146,28 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
         '413': { $ref: '#/components/responses/Error' }
         '429': { $ref: '#/components/responses/Error' }
+  /ingest/liveness:
+    post:
+      operationId: ingestLiveness
+      summary: Report per-service liveness (systemd/Kubernetes collectors)
+      description: >
+        Sent by the Argus agent's systemd or Kubernetes liveness collectors, distinct from log
+        ingest: it says whether the unit/pod is actually running, not whether it has logged
+        recently. Agents send a heartbeat on every poll, not only on change.
+      security: [ { apiKey: [] } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LivenessRequest' }
+      responses:
+        '200':
+          description: Accepted (possibly with some rejected pings)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LivenessResponse' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
   /query/range:
     get:
       operationId: queryRange
@@ -659,6 +681,26 @@ components:
         rejected: { type: integer }
         sampled: { type: integer, description: Lines dropped by the server's sampling policy }
         errors: { type: array, items: { type: string } }
+    LivenessPing:
+      type: object
+      required: [service, source, alive]
+      properties:
+        service: { type: string }
+        source: { type: string, enum: [systemd, kubernetes] }
+        alive: { type: boolean }
+        detail: { type: string }
+    LivenessRequest:
+      type: object
+      required: [pings]
+      properties:
+        pings: { type: array, items: { $ref: '#/components/schemas/LivenessPing' } }
+    LivenessResponse:
+      type: object
+      required: [accepted, rejected]
+      properties:
+        accepted: { type: integer }
+        rejected: { type: integer }
+        errors: { type: array, items: { type: string } }
     ServiceList:
       type: object
       required: [label, data]
@@ -678,6 +720,12 @@ components:
         streams: { type: integer }
         lines: { type: integer, format: int64, description: Flushed lines in the window }
         bytes: { type: integer, format: int64 }
+        liveness_state:
+          type: string
+          enum: [alive, down, unknown]
+          description: >
+            From a systemd/Kubernetes collector, distinct from `active`'s log recency.
+            Absent when no collector has reported for this service.
     StringList:
       type: object
       required: [data]

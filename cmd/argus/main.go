@@ -138,6 +138,10 @@ func main() {
 	jan := &retention.Janitor{Index: ix, Store: store, Days: cfg.RetentionDays, Log: log}
 	go func() { defer wg.Done(); jan.Run(bg, time.Hour) }()
 
+	wg.Add(1)
+	sweep := &ingest.Sweeper{DB: g}
+	go func() { defer wg.Done(); sweep.Run(bg, 15*time.Second) }()
+
 	ql := query.DefaultLimits()
 	ql.MaxMetricRange = cfg.QueryMetricRange
 	ql.Workers = cfg.QueryWorkers

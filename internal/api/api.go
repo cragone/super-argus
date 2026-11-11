@@ -77,6 +77,7 @@ func NewRouter(s *Server) http.Handler {
 		if s.Ingest != nil {
 			r.Post("/ingest/push", s.Ingest.Push)
 			r.Post("/ingest/loki", s.Ingest.Loki)
+			r.Post("/ingest/liveness", s.Ingest.Liveness)
 		}
 
 		r.Group(func(r chi.Router) {

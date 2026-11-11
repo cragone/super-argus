@@ -1,9 +1,41 @@
 # Argus agent as a DaemonSet: one pod per node tails /var/log/pods, so every
-# workload that starts on the cluster shows up in Argus as a service.
+# workload that starts on the cluster shows up in Argus as a service. It also
+# reports real pod liveness (Ready condition, not log recency) via the
+# Kubernetes API, which needs the RBAC below.
 #
 #   kubectl create namespace argus
 #   kubectl -n argus create secret generic argus-agent --from-literal=api-key=argus_xxx
 #   kubectl apply -f daemonset.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: argus-agent
+  namespace: argus
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: argus-agent
+rules:
+  # get/list/watch on pods is namespace- and node-unscoped in RBAC; each agent
+  # pod still only queries its own node, via a spec.nodeName field selector.
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: argus-agent
+subjects:
+  - kind: ServiceAccount
+    name: argus-agent
+    namespace: argus
+roleRef:
+  kind: ClusterRole
+  name: argus-agent
+  apiGroup: rbac.authorization.k8s.io
+---
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
@@ -16,6 +48,7 @@ spec:
     metadata:
       labels: { app: argus-agent }
     spec:
+      serviceAccountName: argus-agent
       tolerations:
         - operator: Exists # also run on tainted nodes
       containers:
@@ -35,6 +68,9 @@ spec:
               value: cluster=dev # extra labels added to every stream
             - name: ARGUS_EXCLUDE_NAMESPACES
               value: argus # do not ship the agent's own logs
+            - name: ARGUS_NODE_NAME # scopes the pod-liveness watch to this node
+              valueFrom:
+                fieldRef: { fieldPath: spec.nodeName }
           resources:
             requests: { cpu: 50m, memory: 64Mi }
             limits: { memory: 256Mi }

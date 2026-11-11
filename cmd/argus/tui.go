@@ -16,6 +16,12 @@ import (
 // process-compose session just for the dashboard. Killing/restarting a
 // process in the TUI only restarts that log tail, not the real
 // systemd-managed service; use systemctl for that.
+//
+// The "liveness" process is a third pane, not a log tail: it polls
+// `systemctl is-active` for both units every few seconds and prints a
+// colored alive/down line, reusing process-compose's own pane rendering
+// rather than a bespoke TUI. It reports the real systemd state, not whether
+// process-compose's own journalctl subprocess happens to still be running.
 const tuiConfig = `version: "0.5"
 processes:
   argus:
@@ -24,6 +30,20 @@ processes:
       restart: "no"
   argus-agent:
     command: "journalctl -u argus-agent.service -f -n 200 -o short-iso --no-hostname"
+    availability:
+      restart: "no"
+  liveness:
+    command: |
+      while true; do
+        for u in argus argus-agent; do
+          if systemctl is-active --quiet "$u.service"; then
+            printf '\033[32m%s: alive\033[0m\n' "$u"
+          else
+            printf '\033[31m%s: down\033[0m\n' "$u"
+          fi
+        done
+        sleep 5
+      done
     availability:
       restart: "no"
 `

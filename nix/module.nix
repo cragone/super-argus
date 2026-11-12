@@ -225,6 +225,13 @@ in {
 				# otherwise -- DynamicUser gets its own ephemeral group by default,
 				# not this service's static one.
 				SupplementaryGroups = [ "systemd-journal" "super-argus" ];
+				# kubernetes/auto mode reads /var/log/pods, which kubelet/k3s lay down
+				# as root:root with no group access -- an unprivileged DynamicUser
+				# can't traverse it otherwise. CAP_DAC_READ_SEARCH is a read-only
+				# bypass of exactly that check (no write access gained), the same
+				# fix Promtail's own systemd unit uses for this.
+				AmbientCapabilities = lib.mkIf (cfg.agent.mode != "journal") [ "CAP_DAC_READ_SEARCH" ];
+				CapabilityBoundingSet = lib.mkIf (cfg.agent.mode != "journal") [ "CAP_DAC_READ_SEARCH" ];
 				NoNewPrivileges = true;
 				ProtectSystem = "strict";
 				ProtectHome = true;

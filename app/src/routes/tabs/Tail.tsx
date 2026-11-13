@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { LevelFilter } from '@/components/LevelFilter';
 import { LogRow } from '@/components/LogRow';
 import { QueryInput } from '@/components/QueryInput';
 import { Button, Chip, ErrorText } from '@/components/ui';
@@ -50,12 +51,13 @@ export function Tail() {
     if (autoScroll && !tail.paused && tail.lines.length > 0) list.current?.scrollToEnd();
   }, [tail.lines, autoScroll, tail.paused]);
 
-  const dot = tail.status === 'live' ? t.levels.info : tail.status === 'error' ? t.danger : t.levels.warn;
+  const dot = tail.status === 'live' ? t.levels.info : tail.status === 'error' ? t.danger : t.levels.warning;
 
   return (
     <div style={{ height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column', backgroundColor: t.bg }}>
       <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 10, borderBottom: `1px solid ${t.border}`, backgroundColor: t.surface }}>
         <QueryInput value={query} onChange={setQuery} onSubmit={start} />
+        <LevelFilter query={query} onChange={setQuery} />
         <div style={{ display: 'flex', gap: 8 }}>
           {running ? (
             <Button title="Stop" variant="ghost" onPress={tail.stop} style={{ flex: 1 }} />
@@ -81,7 +83,7 @@ export function Tail() {
         {formError && <ErrorText>{formError}</ErrorText>}
         {tail.error && <ErrorText>{tail.error}</ErrorText>}
         {tail.droppedLines > 0 && (
-          <span aria-label="Dropped lines" style={{ color: t.levels.warn, fontSize: 13 }}>
+          <span aria-label="Dropped lines" style={{ color: t.levels.warning, fontSize: 13 }}>
             Too fast to keep up: {tail.droppedLines.toLocaleString()} lines were skipped. Narrow the query to see everything.
           </span>
         )}

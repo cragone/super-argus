@@ -47,7 +47,7 @@ export function ServiceLive({ query }: { query: string }) {
   }, [tail.lines, autoScroll, tail.paused]);
 
   const running = tail.status === 'connecting' || tail.status === 'live' || tail.status === 'reconnecting';
-  const dot = tail.status === 'live' ? t.levels.info : tail.status === 'error' ? t.danger : t.levels.warn;
+  const dot = tail.status === 'live' ? t.levels.info : tail.status === 'error' ? t.danger : t.levels.warning;
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
@@ -71,7 +71,7 @@ export function ServiceLive({ query }: { query: string }) {
         </div>
         {tail.error && <ErrorText>{tail.error}</ErrorText>}
         {tail.droppedLines > 0 && (
-          <span aria-label="Dropped lines" style={{ color: t.levels.warn, fontSize: 13 }}>
+          <span aria-label="Dropped lines" style={{ color: t.levels.warning, fontSize: 13 }}>
             Too fast to keep up: {tail.droppedLines.toLocaleString()} lines were skipped. Add a filter to see everything.
           </span>
         )}

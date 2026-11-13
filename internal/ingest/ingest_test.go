@@ -137,7 +137,7 @@ func TestPushFlushesToChunkAndIndex(t *testing.T) {
 
 	var st models.Stream
 	require.NoError(t, r.g.First(&st).Error)
-	require.Equal(t, `service="api"`, st.LabelsText)
+	require.Equal(t, `level="unknown",service="api"`, st.LabelsText)
 	require.WithinDuration(t, t0, st.LastSeen, time.Second, "last_seen is when the stream was last pushed to")
 }
 
@@ -279,8 +279,8 @@ func TestHeaderLabelsMergeAndOverride(t *testing.T) {
 	var ss []models.Stream
 	require.NoError(t, r.g.Order("labels_text").Find(&ss).Error)
 	require.Len(t, ss, 2)
-	require.Equal(t, `env="dev",service="api"`, ss[0].LabelsText)
-	require.Equal(t, `env="prod",service="api"`, ss[1].LabelsText)
+	require.Equal(t, `env="dev",level="unknown",service="api"`, ss[0].LabelsText)
+	require.Equal(t, `env="prod",level="unknown",service="api"`, ss[1].LabelsText)
 
 	require.Equal(t, 400, r.push(`{"line":"x"}`, map[string]string{LabelsHeader: "broken"}).Code)
 }
@@ -360,4 +360,29 @@ func TestStreamCardinalityLimit(t *testing.T) {
 	require.Contains(t, resp.Errors[0], "request IDs")
 	require.Contains(t, resp.Errors[0], "line 3")
 	require.Contains(t, resp.Errors[1], "line 4")
+}
+
+func TestLevelLabelAssignedAndRoutesStreams(t *testing.T) {
+	r := newRig(t)
+	body := strings.Join([]string{
+		`{"labels":{"service":"api","level":"WARN"},"line":"explicit wins over ERROR text"}`,
+		`{"labels":{"service":"api"},"line":"{\"level\":\"critical\",\"msg\":\"x\"}"}`,
+		`{"labels":{"service":"api"},"line":"2026 level=err msg=boom"}`,
+		`{"labels":{"service":"api"},"line":"INFO started"}`,
+		`{"labels":{"service":"api"},"line":"debug chatter"}`,
+	}, "\n")
+	require.Equal(t, 200, r.push(body, nil).Code)
+	var ss []models.Stream
+	require.NoError(t, r.g.Order("labels_text").Find(&ss).Error)
+	var got []string
+	for _, s := range ss {
+		got = append(got, s.LabelsText)
+	}
+	require.Equal(t, []string{
+		`level="error",service="api"`,
+		`level="fatal",service="api"`,
+		`level="info",service="api"`,
+		`level="unknown",service="api"`,
+		`level="warning",service="api"`,
+	}, got)
 }

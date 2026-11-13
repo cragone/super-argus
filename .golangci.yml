@@ -1,5 +1,22 @@
 version: "2"
 linters:
+  settings:
+    errcheck:
+      # best-effort cleanup and writes to http.ResponseWriter/stdout
+      exclude-functions:
+        - (io.Closer).Close
+        - (*os.File).Close
+        - (*database/sql.DB).Close
+        - (io.ReadCloser).Close
+        - fmt.Fprintf
+        - fmt.Fprintln
+        - fmt.Fprint
+        - os.Remove
+        - (*net/textproto.Conn).PrintfLine
+        - (net.Conn).Close
+    staticcheck:
+      # stylistic quickfix/style suggestions, not bugs
+      checks: ["all", "-QF*", "-ST*"]
   default: none
   enable:
     - govet

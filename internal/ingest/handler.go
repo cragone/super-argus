@@ -18,6 +18,7 @@ import (
 
 	"github.com/cragone/Super-Argus/internal/auth"
 	"github.com/cragone/Super-Argus/internal/index"
+	"github.com/cragone/Super-Argus/internal/level"
 	"github.com/cragone/Super-Argus/internal/models"
 	"github.com/cragone/Super-Argus/internal/wal"
 	"gorm.io/gorm"
@@ -257,6 +258,9 @@ func (h *Handler) parseLine(raw []byte, defaults map[string]string, now time.Tim
 	if err := h.validateLabels(labels); err != nil {
 		return pending{}, err
 	}
+	// The server-assigned level label is added after validation so it never
+	// counts against the client's label budget.
+	labels[level.Label] = level.Resolve(labels, *in.Line)
 	return pending{labels: labels, text: index.LabelsText(labels), ts: ts, line: h.truncate(*in.Line)}, nil
 }
 

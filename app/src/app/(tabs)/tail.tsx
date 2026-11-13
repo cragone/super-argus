@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
 
 import { LogRow } from '@/components/LogRow';
+import { LevelFilter } from '@/components/LevelFilter';
 import { QueryInput } from '@/components/QueryInput';
 import { Button, Chip, ErrorText } from '@/components/ui';
 import { MAX_TAIL_LINES, useTail, type TailLine } from '@/hooks/useTail';
@@ -49,12 +50,13 @@ export default function LiveTailScreen() {
     if (autoScroll && !tail.paused && tail.lines.length > 0) list.current?.scrollToEnd({ animated: false });
   }, [tail.lines, autoScroll, tail.paused]);
 
-  const dot = tail.status === 'live' ? t.levels.info : tail.status === 'error' ? t.danger : t.levels.warn;
+  const dot = tail.status === 'live' ? t.levels.info : tail.status === 'error' ? t.danger : t.levels.warning;
 
   return (
     <View style={{ flex: 1, backgroundColor: t.bg }}>
       <View style={{ padding: 12, gap: 10, borderBottomWidth: 1, borderBottomColor: t.border, backgroundColor: t.surface }}>
         <QueryInput value={query} onChange={setQuery} onSubmit={start} />
+        <LevelFilter query={query} onChange={setQuery} />
         <View style={{ flexDirection: 'row', gap: 8 }}>
           {running ? (
             <Button title="Stop" variant="ghost" onPress={tail.stop} style={{ flex: 1 }} />
@@ -80,7 +82,7 @@ export default function LiveTailScreen() {
         {formError && <ErrorText>{formError}</ErrorText>}
         {tail.error && <ErrorText>{tail.error}</ErrorText>}
         {tail.droppedLines > 0 && (
-          <Text accessibilityLabel="Dropped lines" style={{ color: t.levels.warn, fontSize: 13 }}>
+          <Text accessibilityLabel="Dropped lines" style={{ color: t.levels.warning, fontSize: 13 }}>
             Too fast to keep up: {tail.droppedLines.toLocaleString()} lines were skipped. Narrow the query to see everything.
           </Text>
         )}

@@ -5,6 +5,7 @@ import { Text, View } from 'react-native';
 import { errorMessage } from '@/api/client';
 import { LabelBrowser } from '@/components/LabelBrowser';
 import { LogRow } from '@/components/LogRow';
+import { LevelFilter } from '@/components/LevelFilter';
 import { QueryInput } from '@/components/QueryInput';
 import { SaveBar } from '@/components/SaveBar';
 import { TimeRangePicker } from '@/components/TimeRangePicker';
@@ -58,6 +59,7 @@ export default function ExploreScreen() {
     <View style={{ flex: 1, backgroundColor: t.bg }}>
       <View style={{ padding: 12, gap: 10, borderBottomWidth: 1, borderBottomColor: t.border, backgroundColor: t.surface }}>
         <QueryInput value={query} onChange={setQuery} onSubmit={run} />
+        <LevelFilter query={query} onChange={setQuery} />
         <View style={{ flexDirection: 'row', gap: 8 }}>
           <Button title="Run query" onPress={run} loading={result.isFetching} style={{ flex: 1 }} />
           <Button

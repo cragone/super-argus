@@ -45,6 +45,8 @@ Body is NDJSON, optionally gzip (`Content-Encoding: gzip`), max 5 MB:
 - Default labels for the batch can be set with `X-Argus-Labels: service=api,env=prod`; per-line labels override them.
 - Response: `{"accepted":N,"rejected":M,"errors":[...]}`. `200` when anything was accepted, `400` when everything was rejected, `429` (with `Retry-After`) when the key's rate limit is hit, `413` for oversized bodies/batches.
 
+**Levels.** Every line is assigned one of five levels, stored as the `level` stream label: `fatal`, `error`, `warning`, `info` or `unknown`. A client-supplied `level` (or `severity`) label wins if recognized (`warn`/`WARNING` → `warning`, `err` → `error`, `critical`/`panic` → `fatal`, `notice` → `info`, case-insensitive); otherwise the server looks at the line (JSON `level`/`severity` field, logfmt `level=`, or a leading level word); anything else, including `debug` and `trace`, is `unknown`. Filter with `{service="api", level="error"}` or `level=~"error|fatal"`, aggregate with `sum by (level) (count_over_time({service="api"}[5m]))`. The server adds this label, so it doesn't count toward the 15-label limit, but each service/env can fan out into up to five streams. Streams ingested before this feature have no `level` label.
+
 **Do not put user IDs, request IDs or session IDs in labels.** Every distinct label set is a stream, and each API key may hold at most `ARGUS_MAX_STREAMS_PER_KEY` (default 10,000) of them. Put high-cardinality values in the log line instead.
 
 ### Restricting an API key's labels

@@ -1,7 +1,7 @@
 import { memo } from 'react';
 
 import type { QueryEntry } from '@/api/client';
-import { detectLevel, prettyJson } from '@/lib/logLevel';
+import { levelOf, prettyJson } from '@/lib/logLevel';
 import { formatDateTime, formatTime } from '@/lib/time';
 import { mono, useTheme } from '@/theme';
 
@@ -16,8 +16,7 @@ export interface LogRowProps {
 /** One log line: time, level color bar, truncated text. Tap to expand (pretty JSON, fields, stream labels). */
 export const LogRow = memo(function LogRow({ entry, labels, expanded, onToggle, rowKey }: LogRowProps) {
   const t = useTheme();
-  const level = detectLevel(entry.line, entry.fields);
-  const color = level ? t.levels[level] : t.border;
+  const color = t.levels[levelOf(entry.line, entry.fields, labels)];
   const json = expanded ? prettyJson(entry.line) : null;
 
   return (

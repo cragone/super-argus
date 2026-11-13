@@ -10,7 +10,7 @@ export interface Palette {
   accent: string;
   accentText: string;
   danger: string;
-  levels: { error: string; warn: string; info: string; debug: string };
+  levels: Record<'fatal' | 'error' | 'warning' | 'info' | 'unknown', string>;
 }
 
 export const light: Palette = {
@@ -23,7 +23,7 @@ export const light: Palette = {
   accent: '#2f5bea',
   accentText: '#ffffff',
   danger: '#c62828',
-  levels: { error: '#d32f2f', warn: '#ed8f03', info: '#2f7d4f', debug: '#8a93a6' },
+  levels: { fatal: '#8e1b6b', error: '#d32f2f', warning: '#ed8f03', info: '#2f7d4f', unknown: '#8a93a6' },
 };
 
 export const dark: Palette = {
@@ -36,7 +36,7 @@ export const dark: Palette = {
   accent: '#6d8dff',
   accentText: '#0b1020',
   danger: '#ff6b6b',
-  levels: { error: '#ff6b6b', warn: '#ffb454', info: '#5fd18b', debug: '#7b8699' },
+  levels: { fatal: '#e879c6', error: '#ff6b6b', warning: '#ffb454', info: '#5fd18b', unknown: '#7b8699' },
 };
 
 /** Palette for the current system appearance. */

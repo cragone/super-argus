@@ -19,6 +19,7 @@ import (
 
 	"github.com/cragone/Super-Argus/internal/auth"
 	"github.com/cragone/Super-Argus/internal/index"
+	"github.com/cragone/Super-Argus/internal/level"
 	"github.com/cragone/Super-Argus/internal/metrics"
 	"github.com/cragone/Super-Argus/internal/models"
 	"github.com/cragone/Super-Argus/internal/wal"
@@ -310,6 +311,9 @@ func (h *Handler) makePending(labels map[string]string, ts int64, line string, n
 	if err := h.validateLabels(labels, allowed); err != nil {
 		return pending{}, err
 	}
+	// The server-assigned level label is added after validation so it never
+	// counts against the client's label budget.
+	labels[level.Label] = level.Resolve(labels, line)
 	return pending{labels: labels, text: index.LabelsText(labels), ts: ts, line: h.truncate(line)}, nil
 }
 

@@ -30,7 +30,7 @@ export function stateColor(state: AlertState | 'resolved', t: Palette): string {
     case 'firing':
       return t.danger;
     case 'pending':
-      return t.levels.warn;
+      return t.levels.warning;
     case 'resolved':
       return t.levels.info;
     default:

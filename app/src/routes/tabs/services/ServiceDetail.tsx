@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 
+import { LevelFilter } from '@/components/LevelFilter';
 import { ServiceHistory } from '@/components/ServiceHistory';
 import { ServiceLive } from '@/components/ServiceLive';
 import { RestartControl } from '@/components/RestartControl';
@@ -8,6 +9,8 @@ import { Chip } from '@/components/ui';
 import { LivenessBadge } from '@/components/LivenessBadge';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { useServices } from '@/hooks/useLogs';
+import { LEVELS } from '@/lib/logLevel';
+import { getLevelMatcher, setLevelMatcher } from '@/lib/selector';
 import { serviceQuery } from '@/lib/serviceQuery';
 import { useTheme } from '@/theme';
 
@@ -21,7 +24,8 @@ export function ServiceDetail() {
   const [mode, setMode] = useState<Mode>('live');
   const [draft, setDraft] = useState('');
   const [filter, setFilter] = useState('');
-  const query = serviceQuery(name, filter);
+  const [levels, setLevels] = useState<string[]>([]);
+  const query = setLevelMatcher(serviceQuery(name, filter), levels, LEVELS);
   const services = useServices();
   const liveness = services.data?.find((s) => s.name === name)?.liveness_state;
 
@@ -34,7 +38,10 @@ export function ServiceDetail() {
             <Chip label="History" selected={mode === 'history'} onPress={() => setMode('history')} />
             {liveness && <LivenessBadge state={liveness} />}
           </div>
-          <RestartControl service={name} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <LevelFilter query={query} onChange={(q) => setLevels(getLevelMatcher(q))} />
+            <RestartControl service={name} />
+          </div>
         </div>
         <input
           aria-label="Filter lines"

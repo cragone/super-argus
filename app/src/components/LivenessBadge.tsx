@@ -12,7 +12,7 @@ const LABEL: Record<LivenessState, string> = { alive: 'alive', down: 'down', unk
 export function LivenessBadge({ state, size = 10 }: { state: LivenessState | null | undefined; size?: number }) {
   const t = useTheme();
   if (!state) return null;
-  const color = state === 'alive' ? t.levels.info : state === 'down' ? t.danger : t.levels.warn;
+  const color = state === 'alive' ? t.levels.info : state === 'down' ? t.danger : t.levels.warning;
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
       <span

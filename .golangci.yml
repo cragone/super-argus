@@ -12,7 +12,7 @@ linters:
         - fmt.Fprintln
         - fmt.Fprint
         - os.Remove
-        - (*net/textproto.Conn).PrintfLine
+        - (*net/textproto.Writer).PrintfLine
         - (net.Conn).Close
     staticcheck:
       # stylistic quickfix/style suggestions, not bugs

@@ -52,9 +52,11 @@ jobs:
         run: test -z "$(gofmt -l .)" || (gofmt -l . && exit 1)
       - name: go vet
         run: go vet ./...
-      - uses: golangci/golangci-lint-action@v6
+      - uses: golangci/golangci-lint-action@v8
         with:
           version: latest
+          # build with the runner's Go; the prebuilt binary is older than go.mod's Go
+          install-mode: goinstall
       - name: go test
         run: go test -race ./...
 

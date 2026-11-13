@@ -109,7 +109,7 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm run lint
-      - run: npm test -- --ci
+      - run: npm test
       - name: check generated API types are up to date
         run: |
           npm run gen:api

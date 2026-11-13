@@ -30,7 +30,7 @@ func pbField(num int, payload []byte) []byte {
 
 func pbEntry(ts time.Time, line string) []byte {
 	stamp := append(pbVarint(1<<3) /* field 1, wire type 0 */, pbVarint(uint64(ts.Unix()))...)
-	stamp = append(stamp, pbVarint(2<<3) /* field 2, wire type 0 */...)
+	stamp = append(stamp, pbVarint(2<<3) /* field 2, wire type 0 */ ...)
 	stamp = append(stamp, pbVarint(uint64(ts.Nanosecond()))...)
 	return append(pbField(1, stamp), pbField(2, []byte(line))...)
 }

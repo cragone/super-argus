@@ -130,8 +130,8 @@ func (r *actionRunner) poll(ctx context.Context) error {
 // handle claims and runs one action if this agent is the one that owns it.
 func (r *actionRunner) handle(ctx context.Context, a action) {
 	var (
-		owns bool
-		deny string // non-empty: this agent owns it but refuses
+		owns    bool
+		deny    string // non-empty: this agent owns it but refuses
 		restart func(context.Context) (string, error)
 	)
 	switch a.Kind {

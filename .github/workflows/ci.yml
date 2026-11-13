@@ -22,7 +22,7 @@ jobs:
           --health-timeout 5s
           --health-retries 10
       minio:
-        image: bitnami/minio:latest
+        image: bitnamilegacy/minio:latest
         env:
           MINIO_ROOT_USER: argus-test
           MINIO_ROOT_PASSWORD: argus-test-secret
@@ -52,9 +52,11 @@ jobs:
         run: test -z "$(gofmt -l .)" || (gofmt -l . && exit 1)
       - name: go vet
         run: go vet ./...
-      - uses: golangci/golangci-lint-action@v6
+      - uses: golangci/golangci-lint-action@v8
         with:
           version: latest
+          # build with the runner's Go; the prebuilt binary is older than go.mod's Go
+          install-mode: goinstall
       - name: go test
         run: go test -race ./...
 
@@ -109,7 +111,7 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm run lint
-      - run: npm test -- --ci
+      - run: npm test
       - name: check generated API types are up to date
         run: |
           npm run gen:api

@@ -15,7 +15,6 @@ import (
 	"sync"
 	"testing"
 	"time"
-
 )
 
 // assertions is a tiny stand-in for testify: this module has no dependencies.
@@ -137,7 +136,10 @@ func TestSystemdRestartAllowlist(t *testing.T) {
 	r := f.runner(t)
 	r.units = normalizeUnits(map[string]bool{"nginx": true})
 	var ran []string
-	r.systemctl = func(_ context.Context, unit string) (string, error) { ran = append(ran, unit); return "restarted " + unit, nil }
+	r.systemctl = func(_ context.Context, unit string) (string, error) {
+		ran = append(ran, unit)
+		return "restarted " + unit, nil
+	}
 
 	require.NoError(t, r.poll(context.Background()))
 
